@@ -133,9 +133,9 @@ export default function KnowledgeDomainPage() {
 
   // Filter by search
   const searchFiltered = searchQuery
-    ? entities.filter((e) =>
-        Object.values(e).some((v) => {
-          const str = typeof v === 'object' ? v?.value || '' : String(v || '')
+    ? entities.filter((e: Record<string, any>) =>
+        Object.values(e).some((v: any) => {
+          const str = typeof v === 'object' ? (v as any)?.value || '' : String(v || '')
           return str.toLowerCase().includes(searchQuery.toLowerCase())
         })
       )
