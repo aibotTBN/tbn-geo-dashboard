@@ -87,7 +87,7 @@ export default function KnowledgePage() {
                     <CardTitle className="text-lg">{project.name}</CardTitle>
                     <CardDescription>{project.domain} — {total} Entities</CardDescription>
                   </div>
-                  <Link href={`/knowledge/${project.domain}`}>
+                  <Link href={`/knowledge/${encodeURIComponent(project.domain)}`}>
                     <Badge variant="outline" className="cursor-pointer hover:bg-radar-50">
                       Details <ArrowRight size={12} className="ml-1" />
                     </Badge>
@@ -101,7 +101,7 @@ export default function KnowledgePage() {
                       return (
                         <Link
                           key={meta.key}
-                          href={`/knowledge/${project.domain}?type=${meta.key}`}
+                          href={`/knowledge/${encodeURIComponent(project.domain)}?type=${meta.key}`}
                           className="flex items-center gap-3 p-3 rounded-lg border hover:border-radar-200 transition-colors"
                         >
                           <div className={`p-2 rounded-lg ${meta.color}`}>
