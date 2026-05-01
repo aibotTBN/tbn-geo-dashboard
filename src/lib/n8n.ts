@@ -25,6 +25,7 @@ export async function triggerDiagnose(domain: string, companyName?: string, indu
 
 export async function triggerKnowledgeBuilder(domain: string) {
   // Triggers WF2: Knowledge Builder (coxW7hmhcoeTmYuP)
+  // Webhook responds immediately (onReceived), workflow runs in background
   const resp = await fetch(`${N8N_WEBHOOK_URL}/geo-knowledge-builder`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -34,7 +35,8 @@ export async function triggerKnowledgeBuilder(domain: string) {
     const text = await resp.text()
     throw new Error(`n8n knowledge builder failed: ${resp.status} ${text}`)
   }
-  return resp.json()
+  // n8n returns { message: "Workflow was started" } with onReceived mode
+  return { started: true }
 }
 
 export async function queryKnowledgeAPI(tool: string, domain: string) {
