@@ -12,6 +12,7 @@ RUN npm install && npx prisma generate
 
 # Copy source and build with limited memory
 COPY . .
+RUN mkdir -p public
 ENV NODE_OPTIONS="--max-old-space-size=1024"
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
