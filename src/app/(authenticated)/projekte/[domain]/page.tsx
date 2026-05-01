@@ -45,6 +45,13 @@ interface DiagnosisData {
   createdAt: string
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`
+}
+
 export default function ProjectDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -57,6 +64,10 @@ export default function ProjectDetailPage() {
   const [building, setBuilding] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [kbStatus, setKbStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
+  const [kbStartCount, setKbStartCount] = useState(0)
+  const [kbNewCount, setKbNewCount] = useState(0)
+  const [kbElapsed, setKbElapsed] = useState(0)
 
   useEffect(() => {
     loadData()
@@ -118,21 +129,70 @@ export default function ProjectDetailPage() {
 
   async function runKnowledgeBuilder() {
     setBuilding(true)
+    setKbStatus('running')
+    setKbNewCount(0)
+    setKbElapsed(0)
+    const startTotal = Object.values(entityCounts).reduce((a, b) => a + b, 0)
+    setKbStartCount(startTotal)
+    
     try {
       const res = await fetch('/api/geo/knowledge-builder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain }),
       })
-      if (res.ok) {
-        // Workflow runs in background, reload data after a delay
-        setTimeout(loadData, 30000)
+      if (!res.ok) {
+        setKbStatus('error')
+        setBuilding(false)
+        return
       }
     } catch (err) {
       console.error(err)
-    } finally {
+      setKbStatus('error')
       setBuilding(false)
+      return
     }
+    
+    setBuilding(false)
+    
+    // Poll for new entities every 15 seconds
+    const startTime = Date.now()
+    const pollInterval = setInterval(async () => {
+      const elapsed = Math.round((Date.now() - startTime) / 1000)
+      setKbElapsed(elapsed)
+      
+      try {
+        const types = Object.keys(ENTITY_LABELS)
+        const newCounts: Record<string, number> = {}
+        let newTotal = 0
+        for (const type of types) {
+          const res = await fetch(`/api/geo/knowledge?type=${type}&domain=${domain}`)
+          const data = await res.json()
+          const c = data.rows?.length || 0
+          newCounts[type] = c
+          newTotal += c
+        }
+        
+        const diff = newTotal - startTotal
+        setKbNewCount(diff)
+        setEntityCounts(newCounts)
+        
+        // If we got new entities and it's been at least 30s since last change,
+        // or if 15 minutes passed, consider it done
+        if ((diff > 0 && elapsed > 60) || elapsed > 900) {
+          clearInterval(pollInterval)
+          setKbStatus('done')
+        }
+      } catch {
+        // Keep polling on error
+      }
+    }, 15000)
+    
+    // Safety: stop polling after 20 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval)
+      if (kbStatus === 'running') setKbStatus('done')
+    }, 20 * 60 * 1000)
   }
 
   async function deleteProject() {
@@ -207,6 +267,72 @@ export default function ProjectDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Knowledge Builder Status */}
+        {kbStatus !== 'idle' && (
+          <div className={`rounded-lg border px-5 py-4 flex items-center gap-4 ${
+            kbStatus === 'running' ? 'bg-blue-50 border-blue-200' :
+            kbStatus === 'done' ? 'bg-green-50 border-green-200' :
+            'bg-red-50 border-red-200'
+          }`}>
+            {kbStatus === 'running' && (
+              <Loader2 size={20} className="animate-spin text-blue-600 shrink-0" />
+            )}
+            {kbStatus === 'done' && (
+              <Database size={20} className="text-green-600 shrink-0" />
+            )}
+            {kbStatus === 'error' && (
+              <Database size={20} className="text-red-600 shrink-0" />
+            )}
+            <div className="flex-1">
+              {kbStatus === 'running' && (
+                <>
+                  <p className="font-medium text-blue-900">Knowledge Builder läuft…</p>
+                  <p className="text-sm text-blue-700">
+                    {formatDuration(kbElapsed)} vergangen
+                    {kbNewCount > 0
+                      ? ` · ${kbNewCount} neue Entities gefunden`
+                      : ' · Crawle und extrahiere Entities…'}
+                  </p>
+                </>
+              )}
+              {kbStatus === 'done' && (
+                <>
+                  <p className="font-medium text-green-900">Knowledge Builder abgeschlossen ✓</p>
+                  <p className="text-sm text-green-700">
+                    {kbNewCount > 0 ? `${kbNewCount} neue Entities extrahiert` : 'Fertig'} · {formatDuration(kbElapsed)}
+                  </p>
+                </>
+              )}
+              {kbStatus === 'error' && (
+                <>
+                  <p className="font-medium text-red-900">Fehler beim Starten</p>
+                  <p className="text-sm text-red-700">Bitte erneut versuchen</p>
+                </>
+              )}
+            </div>
+            {kbStatus === 'done' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-green-700 hover:text-green-800"
+                onClick={() => setKbStatus('idle')}
+              >
+                Schließen
+              </Button>
+            )}
+            {kbStatus === 'error' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-700 hover:text-red-800"
+                onClick={() => setKbStatus('idle')}
+              >
+                Schließen
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Score Card */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
