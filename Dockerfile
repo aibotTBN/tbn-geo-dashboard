@@ -8,7 +8,7 @@ WORKDIR /app
 # Install deps first (cacheable layer)
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
-RUN npm ci --ignore-scripts && npx prisma generate
+RUN npm install && npx prisma generate
 
 # Copy source and build with limited memory
 COPY . .
