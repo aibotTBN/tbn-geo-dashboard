@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       domain: domain || undefined,
       search,
       page,
-      size: 50,
+      size: 200,
     })
     return NextResponse.json(result)
   } catch (error: any) {
@@ -30,23 +30,29 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PATCH: Update entity status (approve/reject)
+// PATCH: Update entity fields (status, name, description, etc.)
 export async function PATCH(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { type, rowId, status } = body
+  const { type, rowId, fields, status } = body
 
-  if (!type || !rowId || !status) {
-    return NextResponse.json({ error: 'Missing type, rowId, or status' }, { status: 400 })
+  if (!type || !rowId) {
+    return NextResponse.json({ error: 'Missing type or rowId' }, { status: 400 })
   }
 
   const entityType = ENTITY_TYPES.find((t) => t.key === type)
   if (!entityType) return NextResponse.json({ error: 'Invalid entity type' }, { status: 400 })
 
+  // Support both old format (status field) and new format (fields object)
+  const updateFields = fields || (status ? { status } : null)
+  if (!updateFields) {
+    return NextResponse.json({ error: 'Missing fields to update' }, { status: 400 })
+  }
+
   try {
-    const result = await updateRow(entityType.tableId, rowId, { status })
+    const result = await updateRow(entityType.tableId, rowId, updateFields)
     return NextResponse.json({ success: true, result })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
