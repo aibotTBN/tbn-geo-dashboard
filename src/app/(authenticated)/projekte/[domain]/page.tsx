@@ -119,13 +119,15 @@ export default function ProjectDetailPage() {
   async function runKnowledgeBuilder() {
     setBuilding(true)
     try {
-      await fetch('/api/geo/knowledge-builder', {
+      const res = await fetch('/api/geo/knowledge-builder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain }),
       })
-      // Reload counts after a delay
-      setTimeout(loadData, 5000)
+      if (res.ok) {
+        // Workflow runs in background, reload data after a delay
+        setTimeout(loadData, 30000)
+      }
     } catch (err) {
       console.error(err)
     } finally {
@@ -256,7 +258,7 @@ export default function ProjectDetailPage() {
               <CardTitle className="text-lg">Knowledge Base</CardTitle>
               <CardDescription>{totalEntities} Entities extrahiert</CardDescription>
             </div>
-            <Link href={`/knowledge/${domain}`}>
+            <Link href={`/knowledge/${encodeURIComponent(domain)}`}>
               <Button variant="outline" size="sm">
                 Alle anzeigen <ArrowRight size={14} className="ml-1" />
               </Button>
@@ -270,7 +272,7 @@ export default function ProjectDetailPage() {
                 return (
                   <Link
                     key={key}
-                    href={`/knowledge/${domain}?type=${key}`}
+                    href={`/knowledge/${encodeURIComponent(domain)}?type=${key}`}
                     className="flex items-center gap-3 p-3 rounded-lg border hover:border-radar-200 hover:bg-radar-50/30 transition-colors"
                   >
                     <Icon size={18} className="text-gray-400" />
