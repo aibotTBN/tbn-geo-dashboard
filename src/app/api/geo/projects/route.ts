@@ -3,6 +3,28 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// DELETE: Remove a project and all related data (diagnoses cascade)
+export async function DELETE(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { searchParams } = new URL(request.url)
+  const domain = searchParams.get('domain')
+
+  if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 })
+
+  try {
+    // Cascade delete: Diagnosis rows are auto-deleted via onDelete: Cascade
+    await prisma.project.delete({ where: { domain } })
+    return NextResponse.json({ success: true, message: `Projekt ${domain} vollständig gelöscht` })
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
 // GET: List all projects with latest diagnosis
 export async function GET() {
   const session = await getServerSession(authOptions)
