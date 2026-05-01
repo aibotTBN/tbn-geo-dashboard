@@ -124,7 +124,7 @@ export default function DashboardPage() {
                   return (
                     <Link
                       key={project.id}
-                      href={`/projekte/${project.domain}`}
+                      href={`/projekte/${encodeURIComponent(project.domain)}`}
                       className="flex items-center justify-between p-4 rounded-lg border hover:border-radar-200 hover:bg-radar-50/30 transition-colors"
                     >
                       <div className="flex items-center gap-4">
