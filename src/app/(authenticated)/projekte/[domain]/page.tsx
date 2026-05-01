@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScoreGauge, ScoreDimension } from '@/components/geo/score-gauge'
 import {
-  Search, Database, Download, Loader2, Play, ExternalLink, ArrowRight,
+  Search, Database, Download, Loader2, Play, ExternalLink, ArrowRight, Trash2,
   Building2, Briefcase, HelpCircle, Users, FileText, Trophy, BarChart3, Calendar,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -47,6 +47,7 @@ interface DiagnosisData {
 
 export default function ProjectDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const domain = decodeURIComponent(params.domain as string)
 
   const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null)
@@ -54,6 +55,8 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [diagnosing, setDiagnosing] = useState(false)
   const [building, setBuilding] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -130,6 +133,27 @@ export default function ProjectDetailPage() {
     }
   }
 
+  async function deleteProject() {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/geo/projects?domain=${encodeURIComponent(domain)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        router.push('/dashboard')
+      } else {
+        const data = await res.json()
+        alert(data.error || 'Löschen fehlgeschlagen')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Löschen fehlgeschlagen')
+    } finally {
+      setDeleting(false)
+      setShowDeleteConfirm(false)
+    }
+  }
+
   const totalEntities = Object.values(entityCounts).reduce((a, b) => a + b, 0)
 
   if (loading) {
@@ -162,6 +186,24 @@ export default function ProjectDetailPage() {
               <Download size={16} className="mr-2" /> Export
             </Button>
           </Link>
+          <div className="ml-auto">
+            {showDeleteConfirm ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-red-600">Wirklich löschen? Alle Diagnosen gehen verloren.</span>
+                <Button variant="destructive" size="sm" onClick={deleteProject} disabled={deleting}>
+                  {deleting ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
+                  Ja, löschen
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+                  Abbrechen
+                </Button>
+              </div>
+            ) : (
+              <Button variant="outline" className="text-red-500 hover:text-red-700 hover:border-red-300" onClick={() => setShowDeleteConfirm(true)}>
+                <Trash2 size={16} className="mr-2" /> Projekt löschen
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Score Card */}
