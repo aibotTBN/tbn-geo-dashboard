@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScoreGauge, ScoreDimension } from '@/components/geo/score-gauge'
 import {
-  Search, Database, Download, Loader2, Play, ExternalLink,
+  Search, Database, Download, Loader2, Play, ExternalLink, ArrowRight,
   Building2, Briefcase, HelpCircle, Users, FileText, Trophy, BarChart3, Calendar,
 } from 'lucide-react'
 import Link from 'next/link'
