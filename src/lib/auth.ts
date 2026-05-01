@@ -15,7 +15,7 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user }) {
       // Only allow @tbnpr.de emails (adjust as needed)
       const email = user.email || ''
-      const allowedDomains = ['tbnpr.de', 'tbn.de']
+      const allowedDomains = ['tbnpr.de']
       const domain = email.split('@')[1]
       return allowedDomains.includes(domain)
     },
