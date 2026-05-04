@@ -53,6 +53,9 @@ export async function GET(request: Request) {
       "domain" TEXT NOT NULL UNIQUE,
       "name" TEXT NOT NULL,
       "description" TEXT,
+      "industry" TEXT,
+      "coreTopics" TEXT,
+      "pagesCrawled" INTEGER NOT NULL DEFAULT 0,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -69,15 +72,28 @@ export async function GET(request: Request) {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "Diagnosis_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
     )`,
+    // Migration: Add new columns if table already exists
+    `ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "industry" TEXT`,
+    `ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "coreTopics" TEXT`,
+    `ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "pagesCrawled" INTEGER NOT NULL DEFAULT 0`,
   ]
 
   const results: string[] = []
   try {
     for (const sql of statements) {
-      await prisma.$executeRawUnsafe(sql)
-      results.push('OK')
+      try {
+        await prisma.$executeRawUnsafe(sql)
+        results.push('OK')
+      } catch (e: any) {
+        // Don't fail on duplicate column errors
+        if (e.message?.includes('already exists')) {
+          results.push('SKIP (already exists)')
+        } else {
+          throw e
+        }
+      }
     }
-    return NextResponse.json({ success: true, message: 'All tables created', results })
+    return NextResponse.json({ success: true, message: 'All tables created/updated', results })
   } catch (error: any) {
     return NextResponse.json({ 
       error: error.message, 
