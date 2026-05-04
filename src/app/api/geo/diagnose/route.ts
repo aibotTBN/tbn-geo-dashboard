@@ -6,8 +6,6 @@ import { prisma } from '@/lib/prisma'
 
 /**
  * Normalize the n8n GEO Diagnose response into the flat format the frontend expects.
- * n8n returns: { report: { meta, scores: { total, breakdown: { citation, technical, schema, content, freshness } }, ... } }
- * Frontend expects: { geo_score, score_citation, score_tech, score_schema, score_content, score_fresh, pages_analyzed, recommendations }
  */
 function normalizeResult(raw: any) {
   const report = raw?.report
@@ -23,7 +21,6 @@ function normalizeResult(raw: any) {
     score_fresh: bd?.freshness?.score ?? 0,
     pages_analyzed: report?.analysis?.pages_crawled ?? report?.meta?.pages_analyzed ?? undefined,
     recommendations: report?.recommendations ?? [],
-    // Keep the full raw report for the detail view
     _raw: raw,
   }
 }
@@ -38,15 +35,20 @@ export async function POST(request: NextRequest) {
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 })
 
   try {
-    // Ensure project exists
+    // Ensure project exists and get its settings
     const project = await prisma.project.upsert({
       where: { domain },
       update: { updatedAt: new Date() },
       create: { domain, name: companyName || domain },
     })
 
-    // Trigger n8n diagnosis workflow
-    const raw = await triggerDiagnose(domain, companyName, industry)
+    // Use project-level industry & coreTopics, with request overrides
+    const effectiveIndustry = industry || project.industry || 'B2B'
+    const effectiveCoreTopics = project.coreTopics || ''
+    const effectiveName = companyName || project.name || domain
+
+    // Trigger n8n diagnosis workflow with all context
+    const raw = await triggerDiagnose(domain, effectiveName, effectiveIndustry, effectiveCoreTopics)
     const result = normalizeResult(raw)
 
     // Save to DB
