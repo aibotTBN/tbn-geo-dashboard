@@ -10,6 +10,7 @@ import { ScoreGauge, ScoreDimension } from '@/components/geo/score-gauge'
 import {
   Search, Database, Download, Loader2, Play, ExternalLink, ArrowRight, Trash2,
   Building2, Briefcase, HelpCircle, Users, FileText, Trophy, BarChart3, Calendar,
+  Settings, Save, ChevronDown,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -45,6 +46,16 @@ interface DiagnosisData {
   createdAt: string
 }
 
+interface ProjectData {
+  id: string
+  domain: string
+  name: string
+  description?: string
+  industry?: string
+  coreTopics?: string
+  pagesCrawled?: number
+}
+
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`
   const mins = Math.floor(seconds / 60)
@@ -52,11 +63,14 @@ function formatDuration(seconds: number): string {
   return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`
 }
 
+const PAGE_OPTIONS = [10, 25, 50, 100]
+
 export default function ProjectDetailPage() {
   const params = useParams()
   const router = useRouter()
   const domain = decodeURIComponent(params.domain as string)
 
+  const [project, setProject] = useState<ProjectData | null>(null)
   const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null)
   const [entityCounts, setEntityCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
@@ -69,6 +83,17 @@ export default function ProjectDetailPage() {
   const [kbNewCount, setKbNewCount] = useState(0)
   const [kbElapsed, setKbElapsed] = useState(0)
 
+  // Project settings
+  const [showSettings, setShowSettings] = useState(false)
+  const [editIndustry, setEditIndustry] = useState('')
+  const [editCoreTopics, setEditCoreTopics] = useState('')
+  const [editName, setEditName] = useState('')
+  const [savingSettings, setSavingSettings] = useState(false)
+
+  // Knowledge Builder options
+  const [kbMaxPages, setKbMaxPages] = useState(25)
+  const [showKbOptions, setShowKbOptions] = useState(false)
+
   useEffect(() => {
     loadData()
   }, [domain])
@@ -79,9 +104,15 @@ export default function ProjectDetailPage() {
       // Load project data
       const projRes = await fetch('/api/geo/projects')
       const projects = await projRes.json()
-      const project = (projects || []).find((p: any) => p.domain === domain)
-      if (project?.diagnoses?.[0]) {
-        setDiagnosis(project.diagnoses[0])
+      const proj = (projects || []).find((p: any) => p.domain === domain)
+      if (proj) {
+        setProject(proj)
+        setEditIndustry(proj.industry || '')
+        setEditCoreTopics(proj.coreTopics || '')
+        setEditName(proj.name || '')
+        if (proj.diagnoses?.[0]) {
+          setDiagnosis(proj.diagnoses[0])
+        }
       }
 
       // Load entity counts
@@ -100,13 +131,42 @@ export default function ProjectDetailPage() {
     }
   }
 
+  async function saveSettings() {
+    setSavingSettings(true)
+    try {
+      const res = await fetch('/api/geo/projects', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain,
+          name: editName,
+          industry: editIndustry,
+          coreTopics: editCoreTopics,
+        }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setProject((prev) => prev ? { ...prev, ...updated } : updated)
+        setShowSettings(false)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
   async function runDiagnose() {
     setDiagnosing(true)
     try {
       const res = await fetch('/api/geo/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain }),
+        body: JSON.stringify({
+          domain,
+          companyName: project?.name,
+          industry: project?.industry,
+        }),
       })
       const data = await res.json()
       if (data.result?.geo_score !== undefined) {
@@ -127,19 +187,23 @@ export default function ProjectDetailPage() {
     }
   }
 
-  async function runKnowledgeBuilder() {
+  async function runKnowledgeBuilder(offset?: number) {
     setBuilding(true)
     setKbStatus('running')
     setKbNewCount(0)
     setKbElapsed(0)
     const startTotal = Object.values(entityCounts).reduce((a, b) => a + b, 0)
     setKbStartCount(startTotal)
-    
+
     try {
       const res = await fetch('/api/geo/knowledge-builder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain }),
+        body: JSON.stringify({
+          domain,
+          maxPages: kbMaxPages,
+          offset: offset || 0,
+        }),
       })
       if (!res.ok) {
         setKbStatus('error')
@@ -152,15 +216,16 @@ export default function ProjectDetailPage() {
       setBuilding(false)
       return
     }
-    
+
     setBuilding(false)
-    
+    setShowKbOptions(false)
+
     // Poll for new entities every 15 seconds
     const startTime = Date.now()
     const pollInterval = setInterval(async () => {
       const elapsed = Math.round((Date.now() - startTime) / 1000)
       setKbElapsed(elapsed)
-      
+
       try {
         const types = Object.keys(ENTITY_LABELS)
         const newCounts: Record<string, number> = {}
@@ -172,26 +237,36 @@ export default function ProjectDetailPage() {
           newCounts[type] = c
           newTotal += c
         }
-        
+
         const diff = newTotal - startTotal
         setKbNewCount(diff)
         setEntityCounts(newCounts)
-        
+
         // If we got new entities and it's been at least 30s since last change,
         // or if 15 minutes passed, consider it done
         if ((diff > 0 && elapsed > 60) || elapsed > 900) {
           clearInterval(pollInterval)
           setKbStatus('done')
+          // Update pagesCrawled
+          if (project) {
+            const newPages = (project.pagesCrawled || 0) + kbMaxPages
+            await fetch('/api/geo/projects', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ domain, pagesCrawled: newPages }),
+            })
+            setProject((prev) => prev ? { ...prev, pagesCrawled: newPages } : prev)
+          }
         }
       } catch {
         // Keep polling on error
       }
     }, 15000)
-    
+
     // Safety: stop polling after 20 minutes
     setTimeout(() => {
       clearInterval(pollInterval)
-      if (kbStatus === 'running') setKbStatus('done')
+      setKbStatus((prev) => prev === 'running' ? 'done' : prev)
     }, 20 * 60 * 1000)
   }
 
@@ -233,36 +308,183 @@ export default function ProjectDetailPage() {
     <>
       <Header title={domain} />
       <div className="p-6 space-y-6">
+        {/* Project Settings */}
+        {showSettings && (
+          <Card className="border-radar-200">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Settings size={16} /> Projekt-Einstellungen
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setShowSettings(false)}>Schließen</Button>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Firmenname</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-radar-500"
+                    placeholder="z.B. TBN Public Relations GmbH"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Branche / Industry</label>
+                  <input
+                    type="text"
+                    value={editIndustry}
+                    onChange={(e) => setEditIndustry(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-radar-500"
+                    placeholder="z.B. B2B PR, SaaS, MedTech, Maschinenbau..."
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Wird für die KI-Diagnose genutzt, um branchenspezifische Fragen zu generieren</p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Kernthemen / Core Topics</label>
+                  <textarea
+                    value={editCoreTopics}
+                    onChange={(e) => setEditCoreTopics(e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-radar-500 resize-y"
+                    placeholder="z.B. Public Relations, Content Marketing, Lead Management, Medienarbeit..."
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Kommagetrennte Themen — die KI-Diagnose generiert Fragen basierend auf diesen Themen</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" size="sm" onClick={() => setShowSettings(false)}>Abbrechen</Button>
+                <Button size="sm" onClick={saveSettings} disabled={savingSettings}>
+                  {savingSettings ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Save size={14} className="mr-1.5" />}
+                  Speichern
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Info banner if no industry/coreTopics set */}
+        {!project?.industry && !showSettings && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-3 flex items-center gap-3">
+            <Settings size={18} className="text-amber-600 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-900">Branche & Kernthemen noch nicht konfiguriert</p>
+              <p className="text-xs text-amber-700">Für bessere Diagnose-Ergebnisse: Branche und Kernthemen in den Einstellungen hinterlegen.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="border-amber-300 text-amber-700 hover:bg-amber-100">
+              Konfigurieren
+            </Button>
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex flex-wrap gap-3">
           <Button onClick={runDiagnose} disabled={diagnosing}>
             {diagnosing ? <Loader2 size={16} className="animate-spin mr-2" /> : <Search size={16} className="mr-2" />}
             GEO Diagnose starten
           </Button>
-          <Button variant="outline" onClick={runKnowledgeBuilder} disabled={building}>
-            {building ? <Loader2 size={16} className="animate-spin mr-2" /> : <Database size={16} className="mr-2" />}
-            Knowledge Builder starten
-          </Button>
+
+          {/* Knowledge Builder with options dropdown */}
+          <div className="relative">
+            <div className="flex">
+              <Button
+                variant="outline"
+                onClick={() => runKnowledgeBuilder(0)}
+                disabled={building}
+                className="rounded-r-none"
+              >
+                {building ? <Loader2 size={16} className="animate-spin mr-2" /> : <Database size={16} className="mr-2" />}
+                Knowledge Builder starten
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowKbOptions(!showKbOptions)}
+                className="rounded-l-none border-l-0 px-2"
+                disabled={building}
+              >
+                <ChevronDown size={14} />
+              </Button>
+            </div>
+            {showKbOptions && (
+              <div className="absolute top-full left-0 mt-1 w-72 bg-white border rounded-lg shadow-lg z-10 p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Seiten pro Durchlauf</label>
+                  <div className="flex gap-2">
+                    {PAGE_OPTIONS.map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setKbMaxPages(n)}
+                        className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                          kbMaxPages === n
+                            ? 'bg-radar-100 text-radar-700'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {(project?.pagesCrawled || 0) > 0 && (
+                  <div className="text-xs text-gray-500">
+                    Bereits gecrawlt: {project?.pagesCrawled || 0} Seiten
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => runKnowledgeBuilder(0)}
+                    className="flex-1"
+                  >
+                    Von vorne starten
+                  </Button>
+                  {(project?.pagesCrawled || 0) > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runKnowledgeBuilder(project?.pagesCrawled || 0)}
+                      className="flex-1"
+                    >
+                      Weitere {kbMaxPages} Seiten
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <Link href={`/export?domain=${domain}`}>
             <Button variant="outline">
               <Download size={16} className="mr-2" /> Export
             </Button>
           </Link>
-          <div className="ml-auto">
+
+          {/* Settings & Delete */}
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSettings(!showSettings)}
+              className="text-gray-500"
+            >
+              <Settings size={14} className="mr-1.5" />
+              Einstellungen
+            </Button>
             {showDeleteConfirm ? (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-red-600">Wirklich löschen? Alle Diagnosen gehen verloren.</span>
+                <span className="text-sm text-red-600">Wirklich löschen?</span>
                 <Button variant="destructive" size="sm" onClick={deleteProject} disabled={deleting}>
                   {deleting ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
-                  Ja, löschen
+                  Ja
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)}>
-                  Abbrechen
+                  Nein
                 </Button>
               </div>
             ) : (
-              <Button variant="outline" className="text-red-500 hover:text-red-700 hover:border-red-300" onClick={() => setShowDeleteConfirm(true)}>
-                <Trash2 size={16} className="mr-2" /> Projekt löschen
+              <Button variant="outline" className="text-red-500 hover:text-red-700 hover:border-red-300" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+                <Trash2 size={14} className="mr-1.5" /> Löschen
               </Button>
             )}
           </div>
@@ -301,6 +523,7 @@ export default function ProjectDetailPage() {
                   <p className="font-medium text-green-900">Knowledge Builder abgeschlossen ✓</p>
                   <p className="text-sm text-green-700">
                     {kbNewCount > 0 ? `${kbNewCount} neue Entities extrahiert` : 'Fertig'} · {formatDuration(kbElapsed)}
+                    {(project?.pagesCrawled || 0) > 0 && ` · Gesamt: ${project?.pagesCrawled} Seiten gecrawlt`}
                   </p>
                 </>
               )}
@@ -312,14 +535,24 @@ export default function ProjectDetailPage() {
               )}
             </div>
             {kbStatus === 'done' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-green-700 hover:text-green-800"
-                onClick={() => setKbStatus('idle')}
-              >
-                Schließen
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-green-700 hover:text-green-800"
+                  onClick={() => runKnowledgeBuilder(project?.pagesCrawled || 0)}
+                >
+                  Weitere Seiten crawlen
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-green-700 hover:text-green-800"
+                  onClick={() => setKbStatus('idle')}
+                >
+                  Schließen
+                </Button>
+              </div>
             )}
             {kbStatus === 'error' && (
               <Button
@@ -382,7 +615,10 @@ export default function ProjectDetailPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg">Knowledge Base</CardTitle>
-              <CardDescription>{totalEntities} Entities extrahiert</CardDescription>
+              <CardDescription>
+                {totalEntities} Entities extrahiert
+                {(project?.pagesCrawled || 0) > 0 && ` · ${project?.pagesCrawled} Seiten gecrawlt`}
+              </CardDescription>
             </div>
             <Link href={`/knowledge/${encodeURIComponent(domain)}`}>
               <Button variant="outline" size="sm">
