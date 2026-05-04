@@ -80,3 +80,11 @@ model Diagnosis {
   reportJson    String?  @db.Text // Full report JSON from n8n
   createdAt     DateTime @default(now())
 }
+
+// Waitlist for Closed Beta
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String   @default("landing_page")
+  createdAt DateTime @default(now())
+}
