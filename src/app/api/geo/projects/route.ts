@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { domain, name, description } = body
+  const { domain, name, description, industry, coreTopics } = body
 
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 })
 
@@ -59,12 +59,45 @@ export async function POST(request: NextRequest) {
         domain: domain.replace(/^https?:\/\//, '').replace(/\/$/, ''),
         name: name || domain,
         description,
+        industry: industry || undefined,
+        coreTopics: coreTopics || undefined,
       },
     })
     return NextResponse.json(project)
   } catch (error: any) {
     if (error.code === 'P2002') {
       return NextResponse.json({ error: 'Domain existiert bereits' }, { status: 409 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+// PATCH: Update project fields (industry, coreTopics, name, etc.)
+export async function PATCH(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await request.json()
+  const { domain, name, description, industry, coreTopics, pagesCrawled } = body
+
+  if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 })
+
+  try {
+    const updateData: any = {}
+    if (name !== undefined) updateData.name = name
+    if (description !== undefined) updateData.description = description
+    if (industry !== undefined) updateData.industry = industry
+    if (coreTopics !== undefined) updateData.coreTopics = coreTopics
+    if (pagesCrawled !== undefined) updateData.pagesCrawled = pagesCrawled
+
+    const project = await prisma.project.update({
+      where: { domain },
+      data: updateData,
+    })
+    return NextResponse.json(project)
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
