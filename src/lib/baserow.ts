@@ -92,6 +92,33 @@ export async function updateRow(tableId: number, rowId: number, fields: Record<s
   return resp.json()
 }
 
+export async function createRow(tableId: number, fields: Record<string, any>) {
+  const token = await getToken()
+  const resp = await fetch(
+    `${BASEROW_URL}/api/database/rows/table/${tableId}/?user_field_names=true`,
+    {
+      method: 'POST',
+      headers: { Authorization: `JWT ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    }
+  )
+  if (!resp.ok) throw new Error(`Baserow create failed: ${resp.status}`)
+  return resp.json()
+}
+
+export async function deleteRow(tableId: number, rowId: number) {
+  const token = await getToken()
+  const resp = await fetch(
+    `${BASEROW_URL}/api/database/rows/table/${tableId}/${rowId}/`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `JWT ${token}` },
+    }
+  )
+  if (!resp.ok) throw new Error(`Baserow delete failed: ${resp.status}`)
+  return { success: true }
+}
+
 export async function getEntityCounts(domain: string) {
   const counts: Record<string, number> = {}
   for (const type of ENTITY_TYPES) {
