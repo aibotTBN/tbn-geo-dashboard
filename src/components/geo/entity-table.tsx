@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Check, X, Eye, Pencil, Save, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react'
+import { Check, X, Eye, Pencil, Save, ExternalLink, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 
 interface Entity {
   id: number
@@ -103,6 +103,7 @@ export function EntityTable({
   columns,
   onStatusChange,
   onFieldUpdate,
+  onDelete,
   statusFilter,
 }: {
   entities: Entity[]
@@ -110,6 +111,7 @@ export function EntityTable({
   columns: string[]
   onStatusChange?: (id: number, status: string) => void
   onFieldUpdate?: (id: number, field: string, value: string) => void
+  onDelete?: (id: number) => void
   statusFilter?: string
 }) {
   const [expandedId, setExpandedId] = useState<number | null>(null)
@@ -226,6 +228,17 @@ export function EntityTable({
                             <X size={14} />
                           </Button>
                         </>
+                      )}
+                      {onDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                          onClick={(e) => { e.stopPropagation(); onDelete(entity.id) }}
+                          title="Löschen"
+                        >
+                          <Trash2 size={13} />
+                        </Button>
                       )}
                     </div>
                   </td>
