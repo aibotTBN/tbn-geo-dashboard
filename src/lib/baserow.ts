@@ -129,3 +129,99 @@ export async function getEntityCounts(domain: string) {
   }
   return counts
 }
+
+/**
+ * Delete ALL knowledge base rows for a given domain across all entity tables.
+ * Used for cascade-deleting when a project is removed.
+ */
+export async function deleteAllByDomain(domain: string): Promise<{ deleted: number }> {
+  const token = await getToken()
+  let totalDeleted = 0
+
+  // Get the field ID for 'project_domain' once per table, then batch-delete matching rows
+  for (const type of ENTITY_TYPES) {
+    const tableId = type.tableId
+
+    // 1. Get field IDs for this table to find the project_domain field
+    const fieldsResp = await fetch(
+      `${BASEROW_URL}/api/database/fields/table/${tableId}/`,
+      { headers: { Authorization: `JWT ${token}` } }
+    )
+    if (!fieldsResp.ok) continue
+    const fields = await fieldsResp.json()
+    const pdField = fields.find((f: any) => f.name === 'project_domain')
+    if (!pdField) continue
+
+    // 2. Fetch all matching row IDs (paginate if needed)
+    const rowIds: number[] = []
+    let page = 1
+    while (true) {
+      const params = new URLSearchParams({
+        [`filter__field_${pdField.id}__equal`]: domain,
+        size: '200',
+        page: String(page),
+        include: `field_${pdField.id}`,
+      })
+      const resp = await fetch(
+        `${BASEROW_URL}/api/database/rows/table/${tableId}/?${params}`,
+        { headers: { Authorization: `JWT ${token}` } }
+      )
+      if (!resp.ok) break
+      const data = await resp.json()
+      for (const row of data.results || []) {
+        rowIds.push(row.id)
+      }
+      if (!data.next) break
+      page++
+    }
+
+    if (rowIds.length === 0) continue
+
+    // 3. Batch-delete all rows at once
+    const delResp = await fetch(
+      `${BASEROW_URL}/api/database/rows/table/${tableId}/batch-delete/`,
+      {
+        method: 'POST',
+        headers: { Authorization: `JWT ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: rowIds }),
+      }
+    )
+    if (delResp.ok) {
+      totalDeleted += rowIds.length
+    }
+  }
+
+  // Also clean up the geo_projects table (909)
+  const projFieldsResp = await fetch(
+    `${BASEROW_URL}/api/database/fields/table/909/`,
+    { headers: { Authorization: `JWT ${token}` } }
+  )
+  if (projFieldsResp.ok) {
+    const projFields = await projFieldsResp.json()
+    const domainField = projFields.find((f: any) => f.name === 'domain')
+    if (domainField) {
+      const params = new URLSearchParams({
+        [`filter__field_${domainField.id}__equal`]: domain,
+        size: '50',
+      })
+      const resp = await fetch(
+        `${BASEROW_URL}/api/database/rows/table/909/?${params}`,
+        { headers: { Authorization: `JWT ${token}` } }
+      )
+      if (resp.ok) {
+        const data = await resp.json()
+        const ids = (data.results || []).map((r: any) => r.id)
+        if (ids.length > 0) {
+          await fetch(`${BASEROW_URL}/api/database/rows/table/909/batch-delete/`, {
+            method: 'POST',
+            headers: { Authorization: `JWT ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: ids }),
+          })
+          totalDeleted += ids.length
+        }
+      }
+    }
+  }
+
+  return { deleted: totalDeleted }
+}
