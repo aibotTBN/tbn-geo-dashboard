@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { deleteAllByDomain } from '@/lib/baserow'
 
-// DELETE: Remove a project and all related data (diagnoses cascade)
+// DELETE: Remove a project and all related data (diagnoses + knowledge base)
 export async function DELETE(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -14,9 +15,17 @@ export async function DELETE(request: NextRequest) {
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 })
 
   try {
-    // Cascade delete: Diagnosis rows are auto-deleted via onDelete: Cascade
+    // 1. Cascade delete all Baserow knowledge base entries for this domain
+    const baserowResult = await deleteAllByDomain(domain)
+
+    // 2. Delete Prisma project (diagnoses auto-cascade via onDelete: Cascade)
     await prisma.project.delete({ where: { domain } })
-    return NextResponse.json({ success: true, message: `Projekt ${domain} vollständig gelöscht` })
+
+    return NextResponse.json({
+      success: true,
+      message: `Projekt ${domain} vollständig gelöscht`,
+      knowledgeRowsDeleted: baserowResult.deleted,
+    })
   } catch (error: any) {
     if (error.code === 'P2025') {
       return NextResponse.json({ error: 'Projekt nicht gefunden' }, { status: 404 })
