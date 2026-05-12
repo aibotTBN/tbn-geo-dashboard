@@ -65,7 +65,7 @@ export async function queryTable(tableId: number, options: {
 
   const resp = await fetch(
     `${BASEROW_URL}/api/database/rows/table/${tableId}/?${params}`,
-    { headers: { Authorization: `JWT ${token}` }, next: { revalidate: 60 } }
+    { headers: { Authorization: `JWT ${token}` }, cache: 'no-store' }
   )
   if (!resp.ok) throw new Error(`Baserow query failed: ${resp.status}`)
   const data = await resp.json()
