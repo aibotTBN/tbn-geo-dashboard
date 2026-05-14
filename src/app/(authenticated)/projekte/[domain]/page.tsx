@@ -10,10 +10,12 @@ import { ScoreGauge, ScoreDimension } from '@/components/geo/score-gauge'
 import { EngineBreakdown, GoogleAiReadinessCard } from '@/components/geo/engine-breakdown'
 import { ScoreHistory } from '@/components/geo/score-history'
 import { MonitoringConfig } from '@/components/geo/monitoring-config'
+import { CompetitorAnalysis } from '@/components/geo/competitor-analysis'
+import { CitationTracking } from '@/components/geo/citation-tracking'
 import {
   Search, Database, Download, Loader2, Play, ExternalLink, ArrowRight, Trash2,
   Building2, Briefcase, HelpCircle, Users, FileText, Trophy, BarChart3, Calendar,
-  Settings, Save, ChevronDown,
+  Settings, Save, ChevronDown, Users2, Link2,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -121,6 +123,11 @@ export default function ProjectDetailPage() {
   const [kbMaxPages, setKbMaxPages] = useState(25)
   const [showKbOptions, setShowKbOptions] = useState(false)
 
+  // Competitor & Citation data
+  const [reportJsonRaw, setReportJsonRaw] = useState<string | null>(null)
+  const [savedCompetitors, setSavedCompetitors] = useState<string[]>([])
+  const [analysisTab, setAnalysisTab] = useState<'competitors' | 'citations'>('competitors')
+
   useEffect(() => {
     loadData()
   }, [domain])
@@ -153,7 +160,17 @@ export default function ProjectDetailPage() {
             } catch (e) { /* ignore parse errors */ }
           }
           setDiagnosis({ ...d, citationEngines, enginesActive, googleAiReadiness })
+          setReportJsonRaw(d.reportJson || null)
         }
+
+        // Load competitors
+        try {
+          const compRes = await fetch(`/api/geo/projects/${encodeURIComponent(domain)}/competitors`)
+          if (compRes.ok) {
+            const compData = await compRes.json()
+            setSavedCompetitors(compData.competitors || [])
+          }
+        } catch {}
       }
 
       // Load entity counts
@@ -223,6 +240,10 @@ export default function ProjectDetailPage() {
           enginesActive: data.result.engines_active || 1,
           googleAiReadiness: data.result.google_ai_readiness || null,
         })
+        // Store raw report for competitor/citation analysis
+        if (data.result._raw) {
+          setReportJsonRaw(JSON.stringify(data.result._raw))
+        }
       }
     } catch (err) {
       console.error(err)
@@ -699,6 +720,53 @@ export default function ProjectDetailPage() {
 
         {/* Monitoring-Einstellungen */}
         <MonitoringConfig domain={domain} />
+
+        {/* Competitor Analysis & Citation Tracking */}
+        {diagnosis && (
+          <div className="space-y-4">
+            {/* Tab switcher */}
+            <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 w-fit">
+              <button
+                onClick={() => setAnalysisTab('competitors')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  analysisTab === 'competitors'
+                    ? 'bg-white shadow-sm text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Users2 size={15} />
+                Wettbewerber-Analyse
+              </button>
+              <button
+                onClick={() => setAnalysisTab('citations')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  analysisTab === 'citations'
+                    ? 'bg-white shadow-sm text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Link2 size={15} />
+                Quellen-Tracking
+              </button>
+            </div>
+
+            {analysisTab === 'competitors' && (
+              <CompetitorAnalysis
+                domain={domain}
+                reportJson={reportJsonRaw}
+                savedCompetitors={savedCompetitors}
+                onCompetitorsChange={(comps) => setSavedCompetitors(comps)}
+              />
+            )}
+
+            {analysisTab === 'citations' && (
+              <CitationTracking
+                domain={domain}
+                reportJson={reportJsonRaw}
+              />
+            )}
+          </div>
+        )}
 
         {/* Knowledge Base */}
         <Card>
