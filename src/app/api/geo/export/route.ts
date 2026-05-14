@@ -3,6 +3,31 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { queryTable, ENTITY_TYPES, TABLE_IDS } from '@/lib/baserow'
 
+/**
+ * Fetch ALL rows for a domain+table, paginating if needed.
+ * Filters out Rejected entries and deduplicates by name.
+ */
+async function fetchAllRows(tableId: number, domain: string): Promise<any[]> {
+  const allRows: any[] = []
+  let page = 1
+  while (true) {
+    const { rows, totalPages } = await queryTable(tableId, { domain, size: 200, page })
+    allRows.push(...rows)
+    if (page >= totalPages) break
+    page++
+  }
+  // Filter out rejected
+  const filtered = allRows.filter((r) => r.status?.value !== 'Rejected')
+  // Deduplicate by normalized name
+  const seen = new Set<string>()
+  return filtered.filter((r) => {
+    const name = (r.name || r.question || r.title || r.organization_name || r.metric_name || '').trim().toLowerCase()
+    if (!name || seen.has(name)) return false
+    seen.add(name)
+    return true
+  })
+}
+
 // GET: Generate llms.txt, mcp.json, schema.org, or skills.md for a domain
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -44,7 +69,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(mcpConfig)
     }
 
-    // Generate llms.txt
+    // Generate llms.txt — full, deduplicated, no truncation
     const lines: string[] = [
       `# ${domain}`,
       `> Structured knowledge for LLM consumption`,
@@ -55,14 +80,21 @@ export async function GET(request: NextRequest) {
     ]
 
     for (const type of ENTITY_TYPES) {
-      const { rows } = await queryTable(type.tableId, { domain, size: 100 })
+      const rows = await fetchAllRows(type.tableId, domain)
       if (rows.length === 0) continue
       lines.push(`## ${type.label} (${rows.length})`)
-      for (const row of rows.slice(0, 10)) {
-        const name = row.name || row.question || row.title || row.organization_name || ''
-        if (name) lines.push(`- ${name}`)
+      for (const row of rows) {
+        const name = row.name || row.question || row.title || row.organization_name || row.metric_name || ''
+        if (!name) continue
+        // Add description/answer for richer context
+        const desc = row.description || row.answer || row.summary || ''
+        if (desc) {
+          const short = desc.length > 200 ? desc.slice(0, 200).trim() + '…' : desc
+          lines.push(`- **${name}**: ${short}`)
+        } else {
+          lines.push(`- ${name}`)
+        }
       }
-      if (rows.length > 10) lines.push(`- ... und ${rows.length - 10} weitere`)
       lines.push('')
     }
 
@@ -79,10 +111,9 @@ export async function GET(request: NextRequest) {
 async function generateSchemaOrg(domain: string) {
   const schemas: any[] = []
 
-  // 1. Organization (table 910)
-  const { rows: orgs } = await queryTable(TABLE_IDS.geo_organizations, { domain, size: 50 })
+  // 1. Organization (table 910) — deduplicated
+  const orgs = await fetchAllRows(TABLE_IDS.geo_organizations, domain)
   for (const org of orgs) {
-    if (org.status?.value === 'Rejected') continue
     const schema: any = {
       '@context': 'https://schema.org',
       '@type': 'Organization',
@@ -104,10 +135,9 @@ async function generateSchemaOrg(domain: string) {
     schemas.push(schema)
   }
 
-  // 2. Services (table 911)
-  const { rows: services } = await queryTable(TABLE_IDS.geo_services, { domain, size: 100 })
+  // 2. Services (table 911) — deduplicated
+  const services = await fetchAllRows(TABLE_IDS.geo_services, domain)
   for (const svc of services) {
-    if (svc.status?.value === 'Rejected') continue
     const schema: any = {
       '@context': 'https://schema.org',
       '@type': 'Service',
@@ -133,10 +163,9 @@ async function generateSchemaOrg(domain: string) {
     schemas.push(schema)
   }
 
-  // 3. Persons (table 912)
-  const { rows: persons } = await queryTable(TABLE_IDS.geo_persons, { domain, size: 100 })
+  // 3. Persons (table 912) — deduplicated
+  const persons = await fetchAllRows(TABLE_IDS.geo_persons, domain)
   for (const person of persons) {
-    if (person.status?.value === 'Rejected') continue
     const schema: any = {
       '@context': 'https://schema.org',
       '@type': 'Person',
@@ -158,9 +187,9 @@ async function generateSchemaOrg(domain: string) {
     schemas.push(schema)
   }
 
-  // 4. FAQPage (table 913) - aggregate all FAQs into one FAQPage
-  const { rows: faqs } = await queryTable(TABLE_IDS.geo_faq, { domain, size: 200 })
-  const approvedFaqs = faqs.filter((f: any) => f.status?.value !== 'Rejected' && f.question && f.answer)
+  // 4. FAQPage (table 913) — deduplicated, aggregated into one FAQPage
+  const allFaqs = await fetchAllRows(TABLE_IDS.geo_faq, domain)
+  const approvedFaqs = allFaqs.filter((f: any) => f.question && f.answer)
   if (approvedFaqs.length > 0) {
     schemas.push({
       '@context': 'https://schema.org',
@@ -176,10 +205,9 @@ async function generateSchemaOrg(domain: string) {
     })
   }
 
-  // 5. Blog Posts as Article (table 915)
-  const { rows: posts } = await queryTable(TABLE_IDS.geo_blog_posts, { domain, size: 100 })
+  // 5. Blog Posts as Article (table 915) — deduplicated
+  const posts = await fetchAllRows(TABLE_IDS.geo_blog_posts, domain)
   for (const post of posts) {
-    if (post.status?.value === 'Rejected') continue
     const schema: any = {
       '@context': 'https://schema.org',
       '@type': 'Article',
@@ -199,10 +227,9 @@ async function generateSchemaOrg(domain: string) {
     schemas.push(schema)
   }
 
-  // 6. Case Studies as Article (table 914)
-  const { rows: cases } = await queryTable(TABLE_IDS.geo_case_studies, { domain, size: 100 })
+  // 6. Case Studies as Article (table 914) — deduplicated
+  const cases = await fetchAllRows(TABLE_IDS.geo_case_studies, domain)
   for (const cs of cases) {
-    if (cs.status?.value === 'Rejected') continue
     const schema: any = {
       '@context': 'https://schema.org',
       '@type': 'Article',
@@ -224,10 +251,9 @@ async function generateSchemaOrg(domain: string) {
     schemas.push(schema)
   }
 
-  // 7. Events (table 916)
-  const { rows: events } = await queryTable(TABLE_IDS.geo_events, { domain, size: 100 })
+  // 7. Events (table 916) — deduplicated
+  const events = await fetchAllRows(TABLE_IDS.geo_events, domain)
   for (const evt of events) {
-    if (evt.status?.value === 'Rejected') continue
     const schema: any = {
       '@context': 'https://schema.org',
       '@type': 'Event',
@@ -253,10 +279,9 @@ async function generateSchemaOrg(domain: string) {
     schemas.push(schema)
   }
 
-  // 8. Products (table 917)
-  const { rows: products } = await queryTable(TABLE_IDS.geo_products, { domain, size: 100 })
+  // 8. Products (table 917) — deduplicated
+  const products = await fetchAllRows(TABLE_IDS.geo_products, domain)
   for (const prod of products) {
-    if (prod.status?.value === 'Rejected') continue
     const schema: any = {
       '@context': 'https://schema.org',
       '@type': 'Product',
@@ -299,31 +324,19 @@ async function generateSchemaOrg(domain: string) {
 // ─── skills.md Auto-Generator ────────────────────────────────────────────────
 
 async function generateSkillsMd(domain: string) {
-  // Fetch all entity types in parallel
-  const [orgsRes, servicesRes, personsRes, faqsRes, postsRes, casesRes, eventsRes, productsRes, statsRes] =
+  // Fetch all entity types in parallel — deduplicated, rejected filtered
+  const [orgs, services, persons, faqs, posts, cases, events, products, stats] =
     await Promise.all([
-      queryTable(TABLE_IDS.geo_organizations, { domain, size: 50 }),
-      queryTable(TABLE_IDS.geo_services, { domain, size: 100 }),
-      queryTable(TABLE_IDS.geo_persons, { domain, size: 100 }),
-      queryTable(TABLE_IDS.geo_faq, { domain, size: 200 }),
-      queryTable(TABLE_IDS.geo_blog_posts, { domain, size: 100 }),
-      queryTable(TABLE_IDS.geo_case_studies, { domain, size: 100 }),
-      queryTable(TABLE_IDS.geo_events, { domain, size: 50 }),
-      queryTable(TABLE_IDS.geo_products, { domain, size: 100 }),
-      queryTable(TABLE_IDS.geo_statistics, { domain, size: 100 }),
+      fetchAllRows(TABLE_IDS.geo_organizations, domain),
+      fetchAllRows(TABLE_IDS.geo_services, domain),
+      fetchAllRows(TABLE_IDS.geo_persons, domain),
+      fetchAllRows(TABLE_IDS.geo_faq, domain),
+      fetchAllRows(TABLE_IDS.geo_blog_posts, domain),
+      fetchAllRows(TABLE_IDS.geo_case_studies, domain),
+      fetchAllRows(TABLE_IDS.geo_events, domain),
+      fetchAllRows(TABLE_IDS.geo_products, domain),
+      fetchAllRows(TABLE_IDS.geo_statistics, domain),
     ])
-
-  // Filter out rejected entities
-  const filterApproved = (rows: any[]) => rows.filter((r) => r.status?.value !== 'Rejected')
-  const orgs = filterApproved(orgsRes.rows)
-  const services = filterApproved(servicesRes.rows)
-  const persons = filterApproved(personsRes.rows)
-  const faqs = filterApproved(faqsRes.rows)
-  const posts = filterApproved(postsRes.rows)
-  const cases = filterApproved(casesRes.rows)
-  const events = filterApproved(eventsRes.rows)
-  const products = filterApproved(productsRes.rows)
-  const stats = filterApproved(statsRes.rows)
 
   const lines: string[] = []
   const org = orgs[0] // Primary organization
