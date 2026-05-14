@@ -753,6 +753,7 @@ export default function ProjectDetailPage() {
             {analysisTab === 'competitors' && (
               <CompetitorAnalysis
                 domain={domain}
+                projectName={project?.name}
                 reportJson={reportJsonRaw}
                 savedCompetitors={savedCompetitors}
                 onCompetitorsChange={(comps) => setSavedCompetitors(comps)}
