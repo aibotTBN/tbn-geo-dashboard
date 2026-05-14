@@ -34,6 +34,9 @@ export const ENTITY_TYPES = [
 
 let cachedToken: { token: string; expires: number } | null = null
 
+// Cache field IDs per table to enable server-side filtering
+const fieldIdCache: Record<number, Record<string, number>> = {}
+
 async function getToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expires) {
     return cachedToken.token
@@ -49,6 +52,25 @@ async function getToken(): Promise<string> {
   return data.token
 }
 
+/**
+ * Get field IDs for a table (cached). Needed for server-side filtering.
+ */
+async function getFieldIds(tableId: number): Promise<Record<string, number>> {
+  if (fieldIdCache[tableId]) return fieldIdCache[tableId]
+  const token = await getToken()
+  const resp = await fetch(`${BASEROW_URL}/api/database/fields/table/${tableId}/`, {
+    headers: { Authorization: `JWT ${token}` },
+  })
+  if (!resp.ok) return {}
+  const fields = await resp.json()
+  const map: Record<string, number> = {}
+  for (const f of fields) {
+    map[f.name] = f.id
+  }
+  fieldIdCache[tableId] = map
+  return map
+}
+
 export async function queryTable(tableId: number, options: {
   domain?: string
   search?: string
@@ -58,10 +80,19 @@ export async function queryTable(tableId: number, options: {
   const token = await getToken()
   const params = new URLSearchParams({
     user_field_names: 'true',
-    size: String(options.size || 100),
+    size: String(options.size || 200),
     page: String(options.page || 1),
   })
   if (options.search) params.set('search', options.search)
+
+  // Use server-side filtering for domain (fixes pagination bug)
+  if (options.domain) {
+    const fieldIds = await getFieldIds(tableId)
+    const pdFieldId = fieldIds['project_domain']
+    if (pdFieldId) {
+      params.set(`filter__field_${pdFieldId}__equal`, options.domain)
+    }
+  }
 
   const resp = await fetch(
     `${BASEROW_URL}/api/database/rows/table/${tableId}/?${params}`,
@@ -71,11 +102,16 @@ export async function queryTable(tableId: number, options: {
   const data = await resp.json()
 
   let rows = data.results || []
+
+  // Fallback: if no project_domain field exists, use client-side filter
   if (options.domain) {
-    rows = rows.filter((r: any) => (r.project_domain || '').includes(options.domain!))
+    const fieldIds = await getFieldIds(tableId)
+    if (!fieldIds['project_domain']) {
+      rows = rows.filter((r: any) => (r.project_domain || '').includes(options.domain!))
+    }
   }
 
-  return { rows, count: data.count, totalPages: Math.ceil(data.count / (options.size || 100)) }
+  return { rows, count: data.count, totalPages: Math.ceil(data.count / (options.size || 200)) }
 }
 
 export async function updateRow(tableId: number, rowId: number, fields: Record<string, any>) {
@@ -122,10 +158,8 @@ export async function deleteRow(tableId: number, rowId: number) {
 export async function getEntityCounts(domain: string) {
   const counts: Record<string, number> = {}
   for (const type of ENTITY_TYPES) {
-    const { rows } = await queryTable(type.tableId, { domain, size: 1 })
-    // Use count from filtered results
-    const allData = await queryTable(type.tableId, { domain })
-    counts[type.key] = allData.rows.length
+    const { count } = await queryTable(type.tableId, { domain, size: 1 })
+    counts[type.key] = count
   }
   return counts
 }
