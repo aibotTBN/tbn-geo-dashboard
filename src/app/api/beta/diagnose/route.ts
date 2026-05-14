@@ -102,19 +102,14 @@ export async function POST(request: NextRequest) {
 
     // Save email to waitlist (non-blocking)
     try {
-      const existing = await prisma.$queryRawUnsafe(
-        `SELECT id FROM "WaitlistEntry" WHERE email = $1 LIMIT 1`,
-        email
-      ) as any[]
-      if (!existing || existing.length === 0) {
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO "WaitlistEntry" (id, email, "createdAt", source) VALUES (gen_random_uuid(), $1, NOW(), $2)`,
-          email,
-          'beta_analysis'
-        )
+      const existingEntry = await prisma.waitlistEntry.findUnique({ where: { email } })
+      if (!existingEntry) {
+        await prisma.waitlistEntry.create({
+          data: { email, source: 'beta_analysis' },
+        })
       }
     } catch {
-      // Non-critical
+      // Non-critical — email may already exist
     }
 
     // Send Slack notification
