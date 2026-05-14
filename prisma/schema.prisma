@@ -70,6 +70,7 @@ model Project {
   alertThreshold     Int      @default(10) // Score drop % that triggers alert
   alertEmail         String?  // Email for alerts (optional)
   alertSlack         Boolean  @default(true) // Post alerts to Slack
+  competitors        String?  @db.Text // JSON array of competitor domains
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
