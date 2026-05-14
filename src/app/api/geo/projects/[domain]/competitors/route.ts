@@ -6,12 +6,13 @@ import { prisma } from '@/lib/prisma'
 // GET: Get competitor list for a project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { domain: string } }
+  { params }: { params: Promise<{ domain: string }> }
 ) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const domain = decodeURIComponent(params.domain)
+  const { domain: rawDomain } = await params
+  const domain = decodeURIComponent(rawDomain)
   const project = await prisma.project.findUnique({ where: { domain } })
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
@@ -30,12 +31,13 @@ export async function GET(
 // PUT: Update competitor list
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { domain: string } }
+  { params }: { params: Promise<{ domain: string }> }
 ) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const domain = decodeURIComponent(params.domain)
+  const { domain: rawDomain } = await params
+  const domain = decodeURIComponent(rawDomain)
   const body = await request.json()
   const { competitors } = body
 
