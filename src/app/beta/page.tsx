@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Radar, ArrowRight, CheckCircle2, Eye, Shield, FileText, Clock, BarChart3, Zap, Globe2, Lock, Loader2, AlertCircle, TrendingUp, ExternalLink, ChevronDown, ChevronUp, Sparkles, Lightbulb, AlertTriangle, Info } from 'lucide-react'
+import { Radar, ArrowRight, CheckCircle2, Eye, Shield, FileText, Clock, BarChart3, Zap, Globe2, Lock, Loader2, AlertCircle, TrendingUp, ExternalLink, ChevronDown, ChevronUp, Sparkles, Lightbulb, AlertTriangle } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────
    LLM Radar — Closed Beta: Free GEO Analysis (Light Mode)
