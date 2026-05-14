@@ -10,7 +10,8 @@ import { EntityTable } from '@/components/geo/entity-table'
 import { cn } from '@/lib/utils'
 import {
   Building2, Briefcase, HelpCircle, Users, FileText, Trophy, BarChart3, Calendar,
-  Loader2, Search, CheckCircle, XCircle, Filter, Clock, FileCheck, Plus, X,
+  Loader2, Search, CheckCircle, XCircle, Filter, Clock, FileCheck, Plus, X, Sparkles,
+  Save, Eye,
 } from 'lucide-react'
 
 const ENTITY_META = [
@@ -48,6 +49,9 @@ export default function KnowledgeDomainPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [addFormFields, setAddFormFields] = useState<Record<string, string>>({})
   const [addingEntity, setAddingEntity] = useState(false)
+  const [generatingFaqs, setGeneratingFaqs] = useState(false)
+  const [generatedFaqs, setGeneratedFaqs] = useState<any[]>([])
+  const [savingFaqs, setSavingFaqs] = useState(false)
 
   useEffect(() => {
     loadCounts()
@@ -168,6 +172,71 @@ export default function KnowledgeDomainPage() {
     }
   }
 
+  // FAQ Generation
+  async function handleGenerateFaqs() {
+    setGeneratingFaqs(true)
+    setGeneratedFaqs([])
+    try {
+      const res = await fetch('/api/geo/knowledge/generate-faqs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, count: 15, saveToKB: false }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        alert(data.error)
+        return
+      }
+      setGeneratedFaqs(data.faqs || [])
+    } catch (err) {
+      console.error('FAQ generation failed:', err)
+      alert('FAQ-Generierung fehlgeschlagen')
+    } finally {
+      setGeneratingFaqs(false)
+    }
+  }
+
+  async function handleSaveGeneratedFaqs() {
+    setSavingFaqs(true)
+    try {
+      const res = await fetch('/api/geo/knowledge/generate-faqs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, count: 0, saveToKB: true }),
+      })
+      // Actually save individual FAQs
+      let saved = 0
+      for (const faq of generatedFaqs) {
+        try {
+          const saveRes = await fetch('/api/geo/knowledge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'geo_faq',
+              fields: {
+                question: faq.question,
+                answer: faq.answer,
+                category: faq.category || 'Allgemein',
+                language: 'de',
+                project_domain: domain,
+                notes: 'Auto-generiert aus KB-Inhalten',
+              },
+            }),
+          })
+          if (saveRes.ok) saved++
+        } catch {}
+      }
+      setGeneratedFaqs([])
+      loadEntities()
+      loadCounts()
+      alert(`${saved} FAQs gespeichert als Draft`)
+    } catch (err) {
+      console.error('Save FAQs failed:', err)
+    } finally {
+      setSavingFaqs(false)
+    }
+  }
+
   // Bulk actions
   async function bulkApproveAll() {
     const drafts = entities.filter((e) => (e.status?.value || e.status || 'Draft') === 'Draft')
@@ -273,6 +342,23 @@ export default function KnowledgeDomainPage() {
             Eintrag hinzufügen
           </Button>
 
+          {/* Generate FAQs button — only visible on FAQ tab */}
+          {activeType === 'geo_faq' && (
+            <Button
+              size="sm"
+              onClick={handleGenerateFaqs}
+              disabled={generatingFaqs}
+              className="bg-gradient-to-r from-purple-600 to-radar-600 hover:from-purple-700 hover:to-radar-700 text-white"
+            >
+              {generatingFaqs ? (
+                <Loader2 size={14} className="animate-spin mr-1.5" />
+              ) : (
+                <Sparkles size={14} className="mr-1.5" />
+              )}
+              {generatingFaqs ? 'Generiere FAQs...' : 'FAQs generieren (KI)'}
+            </Button>
+          )}
+
           {/* Bulk actions */}
           {statusCounts['Draft'] > 0 && (
             <Button
@@ -336,6 +422,61 @@ export default function KnowledgeDomainPage() {
                   {addingEntity ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Plus size={14} className="mr-1.5" />}
                   Erstellen
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Generated FAQs preview */}
+        {generatedFaqs.length > 0 && (
+          <Card className="border-purple-200 bg-gradient-to-br from-white to-purple-50/30">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles size={16} className="text-purple-600" />
+                  {generatedFaqs.length} neue FAQs generiert
+                </CardTitle>
+                <p className="text-xs text-gray-500 mt-1">Prüfe die Vorschläge und speichere sie als Draft in die Knowledge Base.</p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setGeneratedFaqs([])}
+                >
+                  <X size={14} className="mr-1" />
+                  Verwerfen
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveGeneratedFaqs}
+                  disabled={savingFaqs}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  {savingFaqs ? (
+                    <Loader2 size={14} className="animate-spin mr-1" />
+                  ) : (
+                    <Save size={14} className="mr-1" />
+                  )}
+                  Alle als Draft speichern
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {generatedFaqs.map((faq, i) => (
+                  <div key={i} className="bg-white rounded-lg border p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{faq.question}</p>
+                        <p className="text-sm text-gray-600 mt-1">{faq.answer}</p>
+                      </div>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {faq.category}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
