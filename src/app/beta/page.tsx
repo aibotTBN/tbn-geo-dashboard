@@ -547,7 +547,7 @@ export default function BetaPage() {
                       required
                     />
                   </div>
-                  <p className="text-xs text-gray-400 text-left mt-1.5">Wir senden Ihren Report auch per E-Mail. Kein Spam, versprochen.</p>
+                  <p className="text-xs text-gray-400 text-left mt-1.5">Sie erhalten unser kostenloses GEO-Grundlagen-Booklet per E-Mail. Kein Spam, versprochen.</p>
                 </div>
 
                 {errorMsg && (
