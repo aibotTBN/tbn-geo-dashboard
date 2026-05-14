@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScoreGauge, ScoreDimension } from '@/components/geo/score-gauge'
+import { EngineBreakdown, GoogleAiReadinessCard } from '@/components/geo/engine-breakdown'
 import {
   Search, Database, Download, Loader2, Play, ExternalLink, ArrowRight, Trash2,
   Building2, Briefcase, HelpCircle, Users, FileText, Trophy, BarChart3, Calendar,
@@ -36,6 +37,27 @@ const ENTITY_LABELS: Record<string, string> = {
   geo_events: 'Events',
 }
 
+interface EngineScoreData {
+  status: string
+  score: number
+  mentioned: number
+  total: number
+  knowledge_score?: number
+  source_citations?: string[]
+}
+
+interface GoogleAiData {
+  score: number
+  max: number
+  details: {
+    schema_depth?: { score: number; max: number }
+    google_extended?: { score: number; max: number; blocked: boolean }
+    mcp_discovery?: { score: number; max: number }
+    sitemap_freshness?: { score: number; max: number }
+    gemini_visibility?: { score: number; max: number }
+  }
+}
+
 interface DiagnosisData {
   score: number
   scoreCitation: number
@@ -44,6 +66,9 @@ interface DiagnosisData {
   scoreContent: number
   scoreFresh: number
   createdAt: string
+  citationEngines?: Record<string, EngineScoreData>
+  enginesActive?: number
+  googleAiReadiness?: GoogleAiData | null
 }
 
 interface ProjectData {
@@ -111,7 +136,21 @@ export default function ProjectDetailPage() {
         setEditCoreTopics(proj.coreTopics || '')
         setEditName(proj.name || '')
         if (proj.diagnoses?.[0]) {
-          setDiagnosis(proj.diagnoses[0])
+          const d = proj.diagnoses[0]
+          // Parse reportJson for multi-engine data
+          let citationEngines = {}
+          let enginesActive = 1
+          let googleAiReadiness = null
+          if (d.reportJson) {
+            try {
+              const raw = typeof d.reportJson === 'string' ? JSON.parse(d.reportJson) : d.reportJson
+              const report = raw?.report
+              citationEngines = report?.citation_engines || {}
+              enginesActive = report?.scores?.breakdown?.citation?.engines_active || 1
+              googleAiReadiness = report?.google_ai_readiness || null
+            } catch (e) { /* ignore parse errors */ }
+          }
+          setDiagnosis({ ...d, citationEngines, enginesActive, googleAiReadiness })
         }
       }
 
@@ -178,6 +217,9 @@ export default function ProjectDetailPage() {
           scoreContent: data.result.score_content || 0,
           scoreFresh: data.result.score_fresh || 0,
           createdAt: new Date().toISOString(),
+          citationEngines: data.result.citation_engines || {},
+          enginesActive: data.result.engines_active || 1,
+          googleAiReadiness: data.result.google_ai_readiness || null,
         })
       }
     } catch (err) {
@@ -609,6 +651,44 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Multi-Engine Breakdown + Google AI Readiness */}
+        {diagnosis && (diagnosis.citationEngines && Object.keys(diagnosis.citationEngines).length > 0 || diagnosis.googleAiReadiness) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Engine Breakdown */}
+            {diagnosis.citationEngines && Object.keys(diagnosis.citationEngines).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">KI-Sichtbarkeit nach Engine</CardTitle>
+                  <CardDescription>
+                    Wie gut kennen verschiedene KI-Systeme eure Marke?
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <EngineBreakdown
+                    engines={diagnosis.citationEngines}
+                    enginesActive={diagnosis.enginesActive || 1}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Google AI Readiness */}
+            {diagnosis.googleAiReadiness && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Google AI Readiness</CardTitle>
+                  <CardDescription>
+                    Bereitschaft für Google AI Überblicke & Gemini
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <GoogleAiReadinessCard data={diagnosis.googleAiReadiness} />
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* Knowledge Base */}
         <Card>
