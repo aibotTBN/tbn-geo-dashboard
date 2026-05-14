@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Radar, ArrowRight, CheckCircle2, Search, Shield, FileText, Clock, BarChart3, Brain, Sparkles, Zap, Eye, ChevronRight, Globe2, Bot, Database, Users, TrendingUp, Lock, Mail } from 'lucide-react'
+import { Radar, ArrowRight, CheckCircle2, Search, Shield, FileText, Clock, BarChart3, Brain, Sparkles, Zap, Eye, ChevronRight, Globe2, Bot, Database, Users, TrendingUp, Lock, Mail, X, ChevronDown, Building2, Headphones } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────
-   LLM Radar — Landing Page
+   LLM Radar — Landing Page (v2 — Pricing + Closed Beta)
    ────────────────────────────────────────────────────── */
 
 function AnimatedCounter({ end, suffix = '', duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
@@ -51,7 +51,7 @@ function WaitlistForm({ variant = 'hero' }: { variant?: 'hero' | 'bottom' }) {
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, source: 'landing_page' }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -72,7 +72,12 @@ function WaitlistForm({ variant = 'hero' }: { variant?: 'hero' | 'bottom' }) {
     return (
       <div className={`flex items-center gap-3 ${variant === 'hero' ? 'bg-green-50 border border-green-200' : 'bg-green-900/20 border border-green-500/30'} rounded-xl px-6 py-4`}>
         <CheckCircle2 className={`w-6 h-6 flex-shrink-0 ${variant === 'hero' ? 'text-green-600' : 'text-green-400'}`} />
-        <p className={`font-medium ${variant === 'hero' ? 'text-green-800' : 'text-green-300'}`}>{message}</p>
+        <div>
+          <p className={`font-medium ${variant === 'hero' ? 'text-green-800' : 'text-green-300'}`}>{message}</p>
+          <a href="/beta" className={`text-sm underline mt-1 inline-block ${variant === 'hero' ? 'text-green-600 hover:text-green-700' : 'text-green-400 hover:text-green-300'}`}>
+            → Jetzt Ihre kostenlose GEO-Analyse starten
+          </a>
+        </div>
       </div>
     )
   }
@@ -108,7 +113,7 @@ function WaitlistForm({ variant = 'hero' }: { variant?: 'hero' | 'bottom' }) {
             <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
             <>
-              Kostenlos testen
+              Kostenlos analysieren
               <ArrowRight className="w-5 h-5" />
             </>
           )}
@@ -118,7 +123,7 @@ function WaitlistForm({ variant = 'hero' }: { variant?: 'hero' | 'bottom' }) {
         <p className="text-red-500 text-sm mt-2">{message}</p>
       )}
       <p className={`text-sm mt-3 ${variant === 'hero' ? 'text-gray-500' : 'text-slate-400'}`}>
-        Kostenlose Analyse — kein Abo, keine Kreditkarte.
+        Kostenlose GEO-Analyse — kein Abo, keine Kreditkarte.
       </p>
     </form>
   )
@@ -180,6 +185,24 @@ function ScoreGaugeAnimation() {
   )
 }
 
+function FAQItem({ question, answer }: { question: string; answer: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-b border-gray-200 last:border-0">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between py-5 text-left gap-4 group"
+      >
+        <span className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{question}</span>
+        <ChevronDown className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <div className={`overflow-hidden transition-all duration-300 ${open ? 'max-h-96 pb-5' : 'max-h-0'}`}>
+        <p className="text-gray-600 leading-relaxed">{answer}</p>
+      </div>
+    </div>
+  )
+}
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
@@ -197,11 +220,18 @@ export default function LandingPage() {
               <a href="#features" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Features</a>
               <a href="#how-it-works" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">So funktioniert&apos;s</a>
               <a href="#knowledge" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Knowledge Builder</a>
-              <a href="#cta" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Preise</a>
+              <a href="#pricing" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Preise</a>
+              <a href="#faq" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">FAQ</a>
             </div>
-            <a href="/login" className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors">
-              Anmelden →
-            </a>
+            <div className="flex items-center gap-4">
+              <a href="/beta" className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+                Kostenlose Analyse
+                <ArrowRight className="w-4 h-4" />
+              </a>
+              <a href="/login" className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">
+                Anmelden
+              </a>
+            </div>
           </div>
         </div>
       </nav>
@@ -218,7 +248,7 @@ export default function LandingPage() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-4 py-1.5 mb-6">
               <Sparkles className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-700">Closed Beta — Jetzt Platz sichern</span>
+              <span className="text-sm font-medium text-blue-700">Closed Beta — Jetzt kostenlos testen</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 tracking-tight leading-[1.1]">
@@ -233,7 +263,7 @@ export default function LandingPage() {
               LLM Radar zeigt Ihnen, <strong>was diese KI-Systeme über Sie wissen</strong> — und wie Sie es verbessern.
             </p>
 
-            <div className="mt-10">
+            <div className="mt-10" id="hero-form">
               <WaitlistForm variant="hero" />
             </div>
           </div>
@@ -365,7 +395,15 @@ export default function LandingPage() {
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-100 mb-4">
                   <item.icon className="w-6 h-6 text-blue-600" />
                 </div>
-                <p className="text-4xl font-extrabold text-gray-900 mb-1">{item.stat}</p>
+                <p className="text-4xl font-extrabold text-gray-900 mb-1">
+                  {item.stat === '3×' ? (
+                    <><AnimatedCounter end={3} suffix="×" /></>
+                  ) : item.stat === '40%' ? (
+                    <AnimatedCounter end={40} suffix="%" />
+                  ) : (
+                    <AnimatedCounter end={73} suffix="%" />
+                  )}
+                </p>
                 <p className="text-sm font-semibold text-gray-700 mb-2">{item.label}</p>
                 <p className="text-sm text-gray-500">{item.desc}</p>
               </div>
@@ -399,7 +437,7 @@ export default function LandingPage() {
               {
                 icon: Eye,
                 title: 'KI-Sichtbarkeit',
-                desc: 'Wir fragen ChatGPT, Gemini und Claude direkt nach Ihrem Unternehmen und Ihren Themen. Sie sehen, ob und wie Sie erwähnt werden.',
+                desc: 'Wir fragen ChatGPT, Gemini, Claude und Perplexity direkt nach Ihrem Unternehmen und Ihren Themen. Sie sehen, ob und wie Sie erwähnt werden.',
                 color: 'bg-blue-500',
               },
               {
@@ -466,7 +504,7 @@ export default function LandingPage() {
                 step: '01',
                 icon: Search,
                 title: 'Analysieren',
-                desc: 'Geben Sie Ihre Domain ein. Unser System prüft Ihre Website, fragt KI-Systeme nach Ihrem Unternehmen und erstellt Ihren GEO Score.',
+                desc: 'Geben Sie Ihre Domain ein. Unser System prüft Ihre Website, fragt vier KI-Systeme nach Ihrem Unternehmen und erstellt Ihren GEO Score.',
                 highlight: 'Kostenlos und unverbindlich',
               },
               {
@@ -480,7 +518,7 @@ export default function LandingPage() {
                 step: '03',
                 icon: TrendingUp,
                 title: 'Monitoren & optimieren',
-                desc: 'Verfolgen Sie Ihren Score über die Zeit. Sehen Sie, welche Änderungen wirken. Erhalten Sie konkrete Empfehlungen zur Verbesserung.',
+                desc: 'Verfolgen Sie Ihren Score über die Zeit. Sehen Sie, welche Änderungen wirken. Erhalten Sie Alerts und konkrete Empfehlungen.',
                 highlight: 'Kontinuierliche Verbesserung',
               },
             ].map((item, i) => (
@@ -535,7 +573,7 @@ export default function LandingPage() {
                   { icon: Sparkles, text: 'Automatische Extraktion aus Ihrer Website' },
                   { icon: Users, text: 'Human-in-the-Loop: Sie behalten die volle Kontrolle' },
                   { icon: Shield, text: 'Nur geprüfte, verlässliche Inhalte werden ausgeliefert' },
-                  { icon: Globe2, text: 'MCP-ready: Integration in KI-Systeme vorbereitet' },
+                  { icon: Globe2, text: 'MCP-Server, Schema.org & llms.txt — alle Formate inklusive' },
                 ].map((item) => (
                   <div key={item.text} className="flex items-start gap-3">
                     <div className="mt-0.5 w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
@@ -602,81 +640,238 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══════════════ PRICING TEASER ═══════════════ */}
-      <section id="cta" className="py-20 lg:py-28">
+      {/* ═══════════════ PRICING ═══════════════ */}
+      <section id="pricing" className="py-20 lg:py-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-4 py-1.5 mb-4">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-700">Transparent & fair</span>
+            </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
-              Starten Sie mit einer kostenlosen Analyse
+              Starten Sie kostenlos — skalieren Sie, wenn Sie bereit sind
             </h2>
             <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-              Die erste Analyse ist kostenlos. Für Knowledge Builder und Monitoring gibt es die Closed Beta.
+              Die GEO-Analyse ist kostenlos. Für Knowledge Builder, Monitoring und Agentur-Service wählen Sie den passenden Plan.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Free */}
-            <div className="rounded-2xl border-2 border-gray-200 p-8 bg-white">
-              <h3 className="text-lg font-bold text-gray-900">GEO Analyse</h3>
-              <p className="text-sm text-gray-500 mt-1">Einmal-Check Ihrer KI-Sichtbarkeit</p>
-              <p className="mt-6">
-                <span className="text-4xl font-extrabold text-gray-900">Kostenlos</span>
-              </p>
-              <ul className="mt-8 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-5">
+            {/* FREE */}
+            <div className="rounded-2xl border-2 border-gray-200 p-6 bg-white flex flex-col">
+              <div className="mb-6">
+                <div className="inline-flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                    <Search className="w-4 h-4 text-gray-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">GEO Check</h3>
+                </div>
+                <p className="text-sm text-gray-500">Einmal-Analyse Ihrer KI-Sichtbarkeit</p>
+              </div>
+              <div className="mb-6">
+                <span className="text-4xl font-extrabold text-gray-900">€0</span>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
                 {[
-                  'KI-Sichtbarkeit in ChatGPT, Gemini & Claude',
-                  'Schema Markup Analyse',
-                  'Content-Qualität & Aktualität',
-                  'Technischer Check',
-                  'GEO Score mit Handlungsempfehlungen',
+                  '1 GEO-Diagnose pro Domain',
+                  '4 KI-Engines (OpenAI, Claude, Gemini, Perplexity)',
+                  'Vollständiger GEO Score + Subscores',
+                  'Handlungsempfehlungen',
+                  'Export-Vorschau (Schema.org, llms.txt)',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-gray-700">{item}</span>
                   </li>
                 ))}
               </ul>
               <a
-                href="#hero-form"
-                className="mt-8 block w-full text-center py-3.5 px-6 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold hover:border-blue-300 hover:text-blue-600 transition-all"
+                href="/beta"
+                className="block w-full text-center py-3 px-6 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold hover:border-blue-300 hover:text-blue-600 transition-all"
               >
-                Kostenlose Analyse starten
+                Kostenlos starten
               </a>
             </div>
 
-            {/* Beta */}
-            <div className="rounded-2xl border-2 border-blue-600 p-8 bg-blue-50/50 relative">
+            {/* STARTER */}
+            <div className="rounded-2xl border-2 border-blue-600 p-6 bg-blue-50/30 relative flex flex-col">
               <div className="absolute -top-3 left-6 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                CLOSED BETA
+                EMPFOHLEN
               </div>
-              <h3 className="text-lg font-bold text-gray-900">LLM Radar Pro</h3>
-              <p className="text-sm text-gray-500 mt-1">Knowledge Builder + Monitoring</p>
-              <p className="mt-6">
-                <span className="text-4xl font-extrabold text-gray-900">Beta</span>
-                <span className="text-sm text-gray-500 ml-2">Preise folgen</span>
-              </p>
-              <ul className="mt-8 space-y-3">
+              <div className="mb-6">
+                <div className="inline-flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <Radar className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Starter</h3>
+                </div>
+                <p className="text-sm text-gray-500">Self-Service für KMU & Mittelstand</p>
+              </div>
+              <div className="mb-6">
+                <span className="text-4xl font-extrabold text-gray-900">€99</span>
+                <span className="text-sm text-gray-500 ml-1">/Monat</span>
+                <p className="text-xs text-blue-600 font-medium mt-1">oder €79/Monat bei jährlicher Zahlung</p>
+                <p className="text-xs text-gray-400 mt-0.5">Monatlich kündbar</p>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
                 {[
-                  'Alles aus der kostenlosen Analyse',
-                  'Knowledge Builder — automatische Extraktion',
-                  'Editierbare Knowledge Base',
-                  'Kontinuierliches Score-Monitoring',
-                  'MCP-Integration für KI-Systeme',
-                  'Persönlicher Support durch TBN',
+                  '1 Domain / Projekt',
+                  'Wöchentliches Monitoring + Trends',
+                  'Knowledge Builder (selbst editierbar)',
+                  'Alle Exports (Schema.org, llms.txt, MCP)',
+                  'FAQ-Generator (5×/Monat)',
+                  'Wettbewerber-Analyse (3 Wettbewerber)',
+                  'Quellen-Tracking',
+                  'E-Mail-Support',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-gray-700">{item}</span>
                   </li>
                 ))}
               </ul>
+              <div className="relative">
+                <button
+                  disabled
+                  className="block w-full text-center py-3 px-6 rounded-xl bg-blue-600/50 text-white font-semibold cursor-not-allowed"
+                >
+                  Demnächst verfügbar
+                </button>
+                <p className="text-xs text-center text-gray-500 mt-2">Closed Beta — Platz sichern ↑</p>
+              </div>
+            </div>
+
+            {/* PRO */}
+            <div className="rounded-2xl border-2 border-gray-200 p-6 bg-white flex flex-col">
+              <div className="mb-6">
+                <div className="inline-flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <Building2 className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Pro</h3>
+                </div>
+                <p className="text-sm text-gray-500">Für größere Unternehmen & Agenturen</p>
+              </div>
+              <div className="mb-6">
+                <span className="text-4xl font-extrabold text-gray-900">€499</span>
+                <span className="text-sm text-gray-500 ml-1">/Monat</span>
+                <p className="text-xs text-purple-600 font-medium mt-1">oder €399/Monat bei jährlicher Zahlung</p>
+                <p className="text-xs text-gray-400 mt-0.5">Monatlich kündbar</p>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {[
+                  'Bis zu 5 Domains / Projekte',
+                  'Tägliches Monitoring + Alerts',
+                  'Knowledge Builder (unbegrenzte Entitäten)',
+                  'FAQ-Generator (unbegrenzt)',
+                  'Wettbewerber-Analyse (10 pro Domain)',
+                  'Alle Exports + API-Zugang',
+                  'E-Mail- und Slack-Alerts',
+                  'Prioritäts-Support',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-gray-700">{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="relative">
+                <button
+                  disabled
+                  className="block w-full text-center py-3 px-6 rounded-xl bg-gray-100 text-gray-500 font-semibold cursor-not-allowed"
+                >
+                  Demnächst verfügbar
+                </button>
+                <p className="text-xs text-center text-gray-500 mt-2">Closed Beta — Platz sichern ↑</p>
+              </div>
+            </div>
+
+            {/* MANAGED */}
+            <div className="rounded-2xl border-2 border-gray-200 p-6 bg-gradient-to-b from-slate-50 to-white flex flex-col">
+              <div className="mb-6">
+                <div className="inline-flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                    <Headphones className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Managed</h3>
+                </div>
+                <p className="text-sm text-gray-500">Agentur-Service durch TBN</p>
+              </div>
+              <div className="mb-6">
+                <span className="text-3xl font-extrabold text-gray-900">ab €799</span>
+                <span className="text-sm text-gray-500 ml-1">/Monat</span>
+                <p className="text-xs text-emerald-600 font-medium mt-1">Jahresvertrag · individuell nach Umfang</p>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {[
+                  'Alles aus Pro, plus:',
+                  'TBN pflegt Ihre Knowledge Base',
+                  'Initiales KB-Setup inklusive',
+                  'Monatlicher GEO-Report (PDF)',
+                  'Quartals-Strategie-Call',
+                  'Content-Empfehlungen',
+                  'Unbegrenzte Domains (nach Vereinbarung)',
+                  'Persönlicher Ansprechpartner',
+                ].map((item, i) => (
+                  <li key={item} className="flex items-start gap-2.5">
+                    <CheckCircle2 className={`w-4 h-4 flex-shrink-0 mt-0.5 ${i === 0 ? 'text-emerald-500' : 'text-emerald-500'}`} />
+                    <span className={`text-sm ${i === 0 ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{item}</span>
+                  </li>
+                ))}
+              </ul>
               <a
-                href="#bottom-cta"
-                className="mt-8 block w-full text-center py-3.5 px-6 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
+                href="mailto:geo@tbnpr.de?subject=LLM%20Radar%20Managed%20—%20Anfrage"
+                className="block w-full text-center py-3 px-6 rounded-xl border-2 border-emerald-200 text-emerald-700 font-semibold hover:border-emerald-400 hover:bg-emerald-50 transition-all"
               >
-                Platz in der Beta sichern
+                Kontakt aufnehmen
               </a>
             </div>
+          </div>
+
+          <p className="text-center text-sm text-gray-400 mt-8">
+            Alle Preise verstehen sich zzgl. der gesetzlichen MwSt. von 19%.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══════════════ FAQ ═══════════════ */}
+      <section id="faq" className="py-20 lg:py-28 bg-gray-50">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
+              Häufig gestellte Fragen
+            </h2>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-200 px-6">
+            <FAQItem
+              question="Was ist GEO (Generative Engine Optimization)?"
+              answer="GEO ist das Äquivalent zu SEO für KI-Systeme. Während SEO Ihre Website für Google optimiert, sorgt GEO dafür, dass KI-Assistenten wie ChatGPT, Gemini oder Claude Ihr Unternehmen kennen und korrekt empfehlen. Da immer mehr Nutzer KI statt klassische Suchmaschinen nutzen, wird GEO zum entscheidenden Wettbewerbsfaktor."
+            />
+            <FAQItem
+              question="Was genau passiert bei der kostenlosen GEO-Analyse?"
+              answer="Wir analysieren Ihre Website und befragen vier führende KI-Systeme (OpenAI, Anthropic Claude, Google Gemini und Perplexity) direkt zu Ihrem Unternehmen und Ihren Kernthemen. Daraus berechnen wir Ihren GEO Score (0–100) mit Subscores für KI-Sichtbarkeit, technische Voraussetzungen, Schema Markup, Content-Qualität und Content-Aktualität. Sie erhalten konkrete Handlungsempfehlungen."
+            />
+            <FAQItem
+              question="Was ist der Knowledge Builder?"
+              answer="Der Knowledge Builder extrahiert automatisch die wichtigsten Informationen von Ihrer Website — Services, FAQs, Team, Case Studies, Produkte und mehr — und strukturiert sie in einem maschinenlesbaren Knowledge Layer. Dieses Layer kann als MCP-Server, Schema.org JSON-LD, llms.txt oder skills.md exportiert werden, damit KI-Systeme Ihre Inhalte als verlässliche Quelle nutzen. Sie behalten dabei die volle Kontrolle: Alle Inhalte sind editierbar (Human-in-the-Loop)."
+            />
+            <FAQItem
+              question="Wie unterscheidet sich LLM Radar von reinen Monitoring-Tools?"
+              answer="Die meisten Tools auf dem Markt messen nur — LLM Radar misst und repariert. Neben dem Monitoring bieten wir den Knowledge Builder, einen Schema.org-Generator, einen FAQ-Generator, MCP-Server-Integration und optionalen Agentur-Service. Statt nur ein Thermometer zu sein, sind wir Thermometer + Arzt + Apotheke."
+            />
+            <FAQItem
+              question="Muss ich technisches Wissen mitbringen?"
+              answer="Nein. Die Analyse läuft vollautomatisch. Der Knowledge Builder extrahiert und strukturiert Ihre Inhalte eigenständig. Sie müssen nur prüfen und freigeben. Für die technische Integration (Schema.org, MCP-Server) liefern wir fertige Code-Snippets zum Einbinden — oder unser Managed-Service übernimmt alles für Sie."
+            />
+            <FAQItem
+              question="Was ist der Managed-Service?"
+              answer="Im Managed-Tarif übernimmt das TBN-Team die vollständige Pflege Ihrer Knowledge Base, erstellt monatliche GEO-Reports mit Handlungsempfehlungen, führt quartalsweise Strategie-Calls durch und gibt konkrete Content-Empfehlungen. Ideal für Unternehmen, die das Thema KI-Sichtbarkeit professionell angehen möchten, ohne interne Ressourcen aufzubauen."
+            />
+            <FAQItem
+              question="Wie funktioniert die Closed Beta?"
+              answer="Melden Sie sich mit Ihrer E-Mail an und erhalten Sie sofort Zugang zur kostenlosen GEO-Analyse. Die Paid-Tarife (Starter, Pro, Managed) werden nach der Beta-Phase freigeschaltet. Beta-Tester erhalten exklusive Konditionen beim Launch."
+            />
           </div>
         </div>
       </section>
