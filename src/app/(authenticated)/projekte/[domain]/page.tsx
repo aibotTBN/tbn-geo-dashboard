@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScoreGauge, ScoreDimension } from '@/components/geo/score-gauge'
 import { EngineBreakdown, GoogleAiReadinessCard } from '@/components/geo/engine-breakdown'
+import { ScoreHistory } from '@/components/geo/score-history'
+import { MonitoringConfig } from '@/components/geo/monitoring-config'
 import {
   Search, Database, Download, Loader2, Play, ExternalLink, ArrowRight, Trash2,
   Building2, Briefcase, HelpCircle, Users, FileText, Trophy, BarChart3, Calendar,
@@ -689,6 +691,14 @@ export default function ProjectDetailPage() {
             )}
           </div>
         )}
+
+        {/* Score-Verlauf (Monitoring Phase 2) */}
+        {diagnosis && (
+          <ScoreHistory domain={decodedDomain} />
+        )}
+
+        {/* Monitoring-Einstellungen */}
+        <MonitoringConfig domain={decodedDomain} />
 
         {/* Knowledge Base */}
         <Card>
