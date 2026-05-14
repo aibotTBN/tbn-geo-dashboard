@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 
 /**
  * Normalize the n8n GEO Diagnose response into the flat format the frontend expects.
+ * v2: Now includes per-engine citation data and Google AI Readiness.
  */
 function normalizeResult(raw: any) {
   const report = raw?.report
@@ -21,6 +22,11 @@ function normalizeResult(raw: any) {
     score_fresh: bd?.freshness?.score ?? 0,
     pages_analyzed: report?.analysis?.pages_crawled ?? report?.meta?.pages_analyzed ?? undefined,
     recommendations: report?.recommendations ?? [],
+    // Multi-engine citation data
+    citation_engines: report?.citation_engines ?? {},
+    engines_active: bd?.citation?.engines_active ?? 1,
+    // Google AI Readiness
+    google_ai_readiness: report?.google_ai_readiness ?? null,
     _raw: raw,
   }
 }
