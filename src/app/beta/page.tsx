@@ -58,26 +58,36 @@ function ScoreGauge({ score }: { score: number }) {
   )
 }
 
-/* ── SubScore Bar (light) ── */
-function SubScoreBar({ label, score, maxScore, icon: Icon, color }: { label: string; score: number; maxScore: number; icon: React.ElementType; color: string }) {
+/* ── SubScore Card with explanation ── */
+function SubScoreCard({ label, score, maxScore, icon: Icon, color, explanation, impact }: {
+  label: string; score: number; maxScore: number; icon: React.ElementType; color: string
+  explanation: string; impact: string
+}) {
   const pct = Math.round((score / maxScore) * 100)
+  const statusText = pct >= 70 ? 'Gut' : pct >= 50 ? 'Ausbaufähig' : pct >= 30 ? 'Schwach' : 'Kritisch'
+  const statusColor = pct >= 70 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : pct >= 30 ? 'text-orange-600' : 'text-red-600'
+  const barColor = pct >= 70 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : pct >= 30 ? 'bg-orange-500' : 'bg-red-500'
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
+    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <Icon className={`w-4 h-4 ${color}`} />
-          <span className="text-sm font-medium text-gray-700">{label}</span>
+          <Icon className={`w-5 h-5 ${color}`} />
+          <span className="text-sm font-semibold text-gray-900">{label}</span>
         </div>
-        <span className="text-sm font-bold text-gray-900">{score}<span className="text-gray-400">/{maxScore}</span></span>
+        <div className="text-right">
+          <span className="text-lg font-bold text-gray-900">{score}<span className="text-gray-400 text-sm">/{maxScore}</span></span>
+          <span className={`block text-xs font-medium ${statusColor}`}>{statusText}</span>
+        </div>
       </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-1000 ${
-            pct >= 70 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : pct >= 30 ? 'bg-orange-500' : 'bg-red-500'
-          }`}
-          style={{ width: `${pct}%` }}
-        />
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden my-3">
+        <div className={`h-full rounded-full transition-all duration-1000 ${barColor}`} style={{ width: `${pct}%` }} />
       </div>
+      <p className="text-xs text-gray-500 leading-relaxed">{explanation}</p>
+      {pct < 70 && (
+        <p className="text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2 mt-2.5 leading-relaxed">
+          <strong>Handlungsbedarf:</strong> {impact}
+        </p>
+      )}
     </div>
   )
 }
@@ -640,10 +650,10 @@ export default function BetaPage() {
               </p>
             </div>
 
-            {/* Main score + subscores */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Score + Explanation */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
               {/* Big score */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center shadow-sm">
+              <div className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center shadow-sm">
                 <p className="text-sm font-medium text-gray-500 mb-4">GEO Gesamtscore</p>
                 <ScoreGauge score={result.score} />
                 <p className={`text-lg font-semibold mt-4 ${getScoreLabel(result.score).color}`}>
@@ -651,52 +661,139 @@ export default function BetaPage() {
                 </p>
               </div>
 
-              {/* Subscores */}
-              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <SubScoreBar label="KI-Sichtbarkeit" score={result.scoreCitation} maxScore={30} icon={Eye} color="text-blue-600" />
-                <SubScoreBar label="Technik" score={result.scoreTech} maxScore={20} icon={Shield} color="text-indigo-600" />
-                <SubScoreBar label="Schema Markup" score={result.scoreSchema} maxScore={20} icon={FileText} color="text-purple-600" />
-                <SubScoreBar label="Content-Qualität" score={result.scoreContent} maxScore={15} icon={BarChart3} color="text-emerald-600" />
-                <SubScoreBar label="Content-Aktualität" score={result.scoreFresh} maxScore={15} icon={Clock} color="text-orange-600" />
-                <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-center shadow-sm">
-                  <div className="text-center">
-                    <p className="text-xs text-gray-400 mb-1">4 KI-Engines analysiert</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>ChatGPT</span>
-                      <span>•</span>
-                      <span>Claude</span>
-                      <span>•</span>
-                      <span>Gemini</span>
-                      <span>•</span>
-                      <span>Perplexity</span>
-                    </div>
+              {/* Score explanation */}
+              <div className="lg:col-span-3 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <Lightbulb className="w-5 h-5 text-amber-500" />
+                  Was bedeutet Ihr Score?
+                </h2>
+                <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                  Der <strong>GEO Score</strong> (Generative Engine Optimization) misst, wie gut Ihr Unternehmen von KI-Assistenten wie ChatGPT, Claude, Gemini und Perplexity gefunden und empfohlen wird. Immer mehr Kunden nutzen KI statt Google — <strong>wer hier nicht sichtbar ist, verliert Anfragen an den Wettbewerb.</strong>
+                </p>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="text-center p-2.5 rounded-lg bg-red-50 border border-red-100">
+                    <p className="text-lg font-bold text-red-600">0–39</p>
+                    <p className="text-[10px] text-red-700 font-medium">Kaum sichtbar</p>
                   </div>
+                  <div className="text-center p-2.5 rounded-lg bg-yellow-50 border border-yellow-100">
+                    <p className="text-lg font-bold text-yellow-600">40–69</p>
+                    <p className="text-[10px] text-yellow-700 font-medium">Teilweise sichtbar</p>
+                  </div>
+                  <div className="text-center p-2.5 rounded-lg bg-green-50 border border-green-100">
+                    <p className="text-lg font-bold text-green-600">70–100</p>
+                    <p className="text-[10px] text-green-700 font-medium">Gut positioniert</p>
+                  </div>
+                </div>
+                {result.score < 50 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      <strong>Ihr Score von {result.score} Punkten bedeutet:</strong> Wenn potenzielle Kunden KI-Assistenten nach Lösungen in Ihrem Bereich fragen, wird Ihr Unternehmen selten oder gar nicht genannt. Ihre Wettbewerber erhalten diese Sichtbarkeit stattdessen.
+                    </p>
+                  </div>
+                )}
+                {result.score >= 50 && result.score < 70 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      <strong>Ihr Score von {result.score} Punkten bedeutet:</strong> Ihr Unternehmen wird teilweise von KI-Systemen erkannt, aber es gibt klares Potenzial, die Sichtbarkeit weiter auszubauen und mehr Anfragen zu generieren.
+                    </p>
+                  </div>
+                )}
+                {result.score >= 70 && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-xs text-green-800 leading-relaxed">
+                      <strong>Ihr Score von {result.score} Punkten bedeutet:</strong> Ihr Unternehmen ist gut für KI-Assistenten sichtbar. Mit Monitoring und gezielter Pflege sichern Sie diesen Vorsprung langfristig.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Subscores with explanations */}
+            <div className="mb-8">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Die 5 Faktoren Ihrer KI-Sichtbarkeit</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SubScoreCard
+                  label="KI-Sichtbarkeit" score={result.scoreCitation} maxScore={30}
+                  icon={Eye} color="text-blue-600"
+                  explanation="Wird Ihr Unternehmen erwähnt, wenn ChatGPT, Claude, Gemini oder Perplexity nach Lösungen in Ihrer Branche gefragt werden? Dieser Score zeigt, wie oft Sie in KI-Antworten vorkommen."
+                  impact="KI-Systeme empfehlen aktuell Ihre Wettbewerber statt Sie. Mit einer strukturierten Knowledge Base stellen Sie sicher, dass KI-Assistenten korrekte Informationen über Ihr Unternehmen haben."
+                />
+                <SubScoreCard
+                  label="Technik" score={result.scoreTech} maxScore={20}
+                  icon={Shield} color="text-indigo-600"
+                  explanation="Kann Ihre Website von KI-Crawlern gelesen werden? Dazu gehören robots.txt, Sitemap, SSL, Ladezeit und Meta-Daten — die technischen Grundlagen für KI-Auffindbarkeit."
+                  impact="Technische Barrieren verhindern, dass KI-Systeme Ihre Website-Inhalte korrekt erfassen. Schon kleine Optimierungen können hier große Wirkung haben."
+                />
+                <SubScoreCard
+                  label="Schema Markup" score={result.scoreSchema} maxScore={20}
+                  icon={FileText} color="text-purple-600"
+                  explanation="Schema.org-Markup (JSON-LD) ist die Sprache, die Suchmaschinen und KI-Systeme verstehen. Es beschreibt Ihr Unternehmen, Ihre Services, Personen und Produkte maschinenlesbar."
+                  impact="Ohne Schema Markup müssen KI-Systeme raten, was Ihr Unternehmen tut. Mit strukturierten Daten liefern Sie präzise Antworten — und werden häufiger empfohlen."
+                />
+                <SubScoreCard
+                  label="Content-Qualität" score={result.scoreContent} maxScore={15}
+                  icon={BarChart3} color="text-emerald-600"
+                  explanation="Sind Ihre Inhalte umfangreich, gut strukturiert und fachlich relevant? KI-Systeme bevorzugen Websites mit substanziellen, gut organisierten Informationen."
+                  impact="Dünnere Inhalte werden von KI-Systemen als weniger vertrauenswürdig eingestuft. Hochwertige, thematisch fokussierte Inhalte steigern Ihre Sichtbarkeit in KI-Antworten."
+                />
+                <SubScoreCard
+                  label="Content-Aktualität" score={result.scoreFresh} maxScore={15}
+                  icon={Clock} color="text-orange-600"
+                  explanation="Wie aktuell sind Ihre Website-Inhalte? KI-Systeme gewichten frische, regelmäßig aktualisierte Informationen höher als veraltete Seiten."
+                  impact="Veraltete Inhalte signalisieren KI-Systemen, dass Ihr Unternehmen möglicherweise nicht mehr aktiv ist. Regelmäßige Updates verbessern das Vertrauen und die Sichtbarkeit."
+                />
+                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col items-center justify-center text-center">
+                  <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">4 KI-Engines analysiert</div>
+                  <div className="grid grid-cols-2 gap-2 w-full">
+                    {['ChatGPT', 'Claude', 'Gemini', 'Perplexity'].map(e => (
+                      <span key={e} className="text-xs font-medium text-gray-600 bg-gray-50 rounded-lg px-2 py-1.5">{e}</span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-3 leading-relaxed">Wir befragen die vier wichtigsten KI-Assistenten mit branchenrelevanten Fragen.</p>
                 </div>
               </div>
             </div>
 
-            {/* Human-readable report */}
+            {/* Impact callout */}
+            {result.score < 60 && (
+              <div className="mb-8 bg-red-50 border border-red-200 rounded-2xl p-6">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-base font-bold text-red-900 mb-2">Was das für Ihr Unternehmen bedeutet</h3>
+                    <p className="text-sm text-red-800 leading-relaxed mb-3">
+                      Bereits heute nutzen <strong>über 30% der B2B-Entscheider</strong> KI-Assistenten für die Recherche nach Dienstleistern und Produkten. Dieser Anteil wächst monatlich.
+                    </p>
+                    <p className="text-sm text-red-800 leading-relaxed">
+                      Bei einem GEO Score von <strong>{result.score} Punkten</strong> entgeht Ihrem Unternehmen ein wachsender Teil dieser Anfragen. Ihre Wettbewerber, die in KI-Antworten sichtbar sind, erhalten diese Leads stattdessen — ohne dass Sie davon erfahren.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Human-readable report details */}
             <ReadableReport reportJson={result.reportJson} domain={domain} />
 
             {/* CTA: Next steps */}
             <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-8">
               <div className="max-w-2xl mx-auto text-center">
                 <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                  So verbessern Sie Ihren Score
+                  Ihre KI-Sichtbarkeit gezielt verbessern
                 </h2>
                 <p className="text-gray-600 mb-8">
-                  Mit dem Knowledge Builder, Monitoring und konkreten Optimierungen steigern Sie Ihre KI-Sichtbarkeit nachhaltig.
+                  LLM Radar zeigt Ihnen nicht nur, wo Sie stehen — sondern hilft aktiv dabei, Ihre Sichtbarkeit in KI-Systemen zu steigern.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                   {[
-                    { icon: Zap, title: 'Knowledge Builder', desc: 'Strukturierte Wissensbasis für KI-Systeme aufbauen' },
-                    { icon: TrendingUp, title: 'Score Monitoring', desc: 'Entwicklung tracken und Alerts bei Veränderungen' },
-                    { icon: FileText, title: 'Schema.org & MCP', desc: 'Technische Optimierung für maximale Sichtbarkeit' },
+                    { icon: Zap, title: 'Knowledge Builder', desc: 'Erstellt eine maschinenlesbare Wissensbasis, die KI-Systeme mit korrekten Informationen über Ihr Unternehmen versorgt.' },
+                    { icon: TrendingUp, title: 'Score Monitoring', desc: 'Verfolgt Ihren GEO Score über Zeit und warnt Sie, wenn sich Ihre KI-Sichtbarkeit verändert.' },
+                    { icon: FileText, title: 'Schema.org & MCP', desc: 'Generiert technische Optimierungen (JSON-LD, MCP-Server), die Ihre Website für KI-Systeme maschinenlesbar machen.' },
                   ].map((item) => (
-                    <div key={item.title} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-                      <item.icon className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-                      <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                      <p className="text-xs text-gray-500 mt-1">{item.desc}</p>
+                    <div key={item.title} className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm text-left">
+                      <item.icon className="w-6 h-6 text-blue-600 mb-2" />
+                      <p className="text-sm font-semibold text-gray-900 mb-1">{item.title}</p>
+                      <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
                     </div>
                   ))}
                 </div>
