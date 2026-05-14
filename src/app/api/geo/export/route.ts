@@ -109,92 +109,109 @@ export async function GET(request: NextRequest) {
 // ─── Schema.org JSON-LD Generator ────────────────────────────────────────────
 
 async function generateSchemaOrg(domain: string) {
-  const schemas: any[] = []
+  // Fetch all data in parallel — deduplicated, rejected filtered
+  const [orgs, services, persons, allFaqs, posts, cases, events, products] =
+    await Promise.all([
+      fetchAllRows(TABLE_IDS.geo_organizations, domain),
+      fetchAllRows(TABLE_IDS.geo_services, domain),
+      fetchAllRows(TABLE_IDS.geo_persons, domain),
+      fetchAllRows(TABLE_IDS.geo_faq, domain),
+      fetchAllRows(TABLE_IDS.geo_blog_posts, domain),
+      fetchAllRows(TABLE_IDS.geo_case_studies, domain),
+      fetchAllRows(TABLE_IDS.geo_events, domain),
+      fetchAllRows(TABLE_IDS.geo_products, domain),
+    ])
 
-  // 1. Organization (table 910) — deduplicated
-  const orgs = await fetchAllRows(TABLE_IDS.geo_organizations, domain)
-  for (const org of orgs) {
-    const schema: any = {
+  const schemas: any[] = []
+  const org = orgs[0] // Primary organization
+
+  // ── 1. Organization — consolidated with nested services, employees, products ──
+  if (org) {
+    const orgSchema: any = {
       '@context': 'https://schema.org',
       '@type': 'Organization',
       name: org.name || org.Name || domain,
     }
-    if (org.legal_name) schema.legalName = org.legal_name
-    if (org.description) schema.description = org.description
-    if (org.website) schema.url = org.website
-    if (org.email) schema.email = org.email
-    if (org.phone) schema.telephone = org.phone
+    if (org.legal_name) orgSchema.legalName = org.legal_name
+    if (org.description) orgSchema.description = org.description
+    if (org.website) orgSchema.url = org.website
+    if (org.email) orgSchema.email = org.email
+    if (org.phone) orgSchema.telephone = org.phone
     if (org.location) {
-      schema.address = { '@type': 'PostalAddress', addressLocality: org.location }
+      orgSchema.address = { '@type': 'PostalAddress', addressLocality: org.location }
     }
-    if (org.founding_year) schema.foundingDate = String(org.founding_year)
-    if (org.team_size) schema.numberOfEmployees = { '@type': 'QuantitativeValue', value: org.team_size }
+    if (org.founding_year) orgSchema.foundingDate = String(org.founding_year)
+    if (org.team_size) orgSchema.numberOfEmployees = { '@type': 'QuantitativeValue', value: org.team_size }
     if (org.awards) {
-      schema.award = org.awards.split(/[,;\n]/).map((a: string) => a.trim()).filter(Boolean)
+      orgSchema.award = org.awards.split(/[,;\n]/).map((a: string) => a.trim()).filter(Boolean)
     }
-    schemas.push(schema)
+
+    // Nest services as makesOffer (compact: name + short description)
+    if (services.length > 0) {
+      orgSchema.makesOffer = services.map((svc) => {
+        const offer: any = {
+          '@type': 'Offer',
+          itemOffered: {
+            '@type': 'Service',
+            name: svc.name || svc.Name,
+          },
+        }
+        if (svc.description) {
+          offer.itemOffered.description = svc.description.length > 160
+            ? svc.description.slice(0, 160).trim() + '…'
+            : svc.description
+        }
+        if (svc.category) offer.itemOffered.category = svc.category
+        return offer
+      })
+    }
+
+    // Nest persons as employee (compact)
+    if (persons.length > 0) {
+      orgSchema.employee = persons.map((p) => {
+        const person: any = { '@type': 'Person', name: p.name || p.Name }
+        if (p.role) person.jobTitle = p.role
+        if (p.expertise) {
+          person.knowsAbout = p.expertise.split(/[,;\n]/).map((e: string) => e.trim()).filter(Boolean)
+        }
+        return person
+      })
+    }
+
+    // Nest products (compact)
+    if (products.length > 0) {
+      orgSchema.owns = products.map((prod) => {
+        const p: any = { '@type': 'Product', name: prod.name || prod.Name }
+        if (prod.description) {
+          p.description = prod.description.length > 160
+            ? prod.description.slice(0, 160).trim() + '…'
+            : prod.description
+        }
+        return p
+      })
+    }
+
+    // Nest events (compact)
+    if (events.length > 0) {
+      orgSchema.event = events.map((evt) => {
+        const e: any = { '@type': 'Event', name: evt.name || evt.Name }
+        if (evt.event_date) e.startDate = evt.event_date
+        if (evt.location) e.location = { '@type': 'Place', name: evt.location }
+        return e
+      })
+    }
+
+    schemas.push(orgSchema)
   }
 
-  // 2. Services (table 911) — deduplicated
-  const services = await fetchAllRows(TABLE_IDS.geo_services, domain)
-  for (const svc of services) {
-    const schema: any = {
-      '@context': 'https://schema.org',
-      '@type': 'Service',
-      name: svc.name || svc.Name,
-    }
-    if (svc.description) schema.description = svc.description
-    if (svc.category) schema.category = svc.category
-    if (svc.target_audience) {
-      schema.audience = { '@type': 'Audience', audienceType: svc.target_audience }
-    }
-    if (svc.source_url) schema.url = svc.source_url
-    if (svc.benefits) {
-      schema.additionalProperty = {
-        '@type': 'PropertyValue',
-        name: 'benefits',
-        value: svc.benefits,
-      }
-    }
-    // Link to provider org
-    if (orgs.length > 0) {
-      schema.provider = { '@type': 'Organization', name: orgs[0].name || domain }
-    }
-    schemas.push(schema)
-  }
-
-  // 3. Persons (table 912) — deduplicated
-  const persons = await fetchAllRows(TABLE_IDS.geo_persons, domain)
-  for (const person of persons) {
-    const schema: any = {
-      '@context': 'https://schema.org',
-      '@type': 'Person',
-      name: person.name || person.Name,
-    }
-    if (person.role) schema.jobTitle = person.role
-    if (person.bio) schema.description = person.bio
-    if (person.email) schema.email = person.email
-    if (person.linkedin_url) {
-      schema.sameAs = [person.linkedin_url]
-    }
-    if (person.expertise) {
-      schema.knowsAbout = person.expertise.split(/[,;\n]/).map((e: string) => e.trim()).filter(Boolean)
-    }
-    // Link to employer org
-    if (orgs.length > 0) {
-      schema.worksFor = { '@type': 'Organization', name: orgs[0].name || domain }
-    }
-    schemas.push(schema)
-  }
-
-  // 4. FAQPage (table 913) — deduplicated, aggregated into one FAQPage
-  const allFaqs = await fetchAllRows(TABLE_IDS.geo_faq, domain)
+  // ── 2. FAQPage — kept separate (Google requires standalone FAQPage schema) ──
   const approvedFaqs = allFaqs.filter((f: any) => f.question && f.answer)
   if (approvedFaqs.length > 0) {
+    // Limit to 25 most important FAQs to keep size reasonable
     schemas.push({
       '@context': 'https://schema.org',
       '@type': 'FAQPage',
-      mainEntity: approvedFaqs.map((faq: any) => ({
+      mainEntity: approvedFaqs.slice(0, 25).map((faq: any) => ({
         '@type': 'Question',
         name: faq.question,
         acceptedAnswer: {
@@ -205,9 +222,8 @@ async function generateSchemaOrg(domain: string) {
     })
   }
 
-  // 5. Blog Posts as Article (table 915) — deduplicated
-  const posts = await fetchAllRows(TABLE_IDS.geo_blog_posts, domain)
-  for (const post of posts) {
+  // ── 3. Articles — top 10 blog posts + top 5 case studies (compact) ──
+  for (const post of posts.slice(0, 10)) {
     const schema: any = {
       '@context': 'https://schema.org',
       '@type': 'Article',
@@ -220,86 +236,26 @@ async function generateSchemaOrg(domain: string) {
       schema.keywords = post.keywords.split(/[,;\n]/).map((k: string) => k.trim()).filter(Boolean)
     }
     if (post.source_url) schema.url = post.source_url
-    if (post.word_count) schema.wordCount = post.word_count
-    if (post.key_points) {
-      schema.articleBody = post.key_points
-    }
+    // Omit articleBody to keep size small — description is enough for schema
     schemas.push(schema)
   }
 
-  // 6. Case Studies as Article (table 914) — deduplicated
-  const cases = await fetchAllRows(TABLE_IDS.geo_case_studies, domain)
-  for (const cs of cases) {
+  for (const cs of cases.slice(0, 5)) {
     const schema: any = {
       '@context': 'https://schema.org',
       '@type': 'Article',
       '@additionalType': 'CaseStudy',
       headline: cs.title || cs.Name,
     }
-    // Compose description from challenge + solution + results
     const parts: string[] = []
     if (cs.challenge) parts.push(`Challenge: ${cs.challenge}`)
     if (cs.solution) parts.push(`Solution: ${cs.solution}`)
     if (cs.results) parts.push(`Results: ${cs.results}`)
-    if (parts.length > 0) schema.description = parts.join(' | ')
-    if (cs.client_name) schema.about = { '@type': 'Organization', name: cs.client_name }
-    if (cs.client_industry) schema.genre = cs.client_industry
+    if (parts.length > 0) {
+      const desc = parts.join(' | ')
+      schema.description = desc.length > 300 ? desc.slice(0, 300).trim() + '…' : desc
+    }
     if (cs.source_url) schema.url = cs.source_url
-    if (cs.testimonial_quote) {
-      schema.citation = cs.testimonial_quote
-    }
-    schemas.push(schema)
-  }
-
-  // 7. Events (table 916) — deduplicated
-  const events = await fetchAllRows(TABLE_IDS.geo_events, domain)
-  for (const evt of events) {
-    const schema: any = {
-      '@context': 'https://schema.org',
-      '@type': 'Event',
-      name: evt.name || evt.Name,
-    }
-    if (evt.description) schema.description = evt.description
-    if (evt.event_date) schema.startDate = evt.event_date
-    if (evt.location) {
-      schema.location = { '@type': 'Place', name: evt.location }
-    }
-    if (evt.event_type) schema.eventAttendanceMode = evt.event_type
-    if (evt.registration_url) schema.url = evt.registration_url
-    if (evt.speakers) {
-      schema.performer = evt.speakers.split(/[,;\n]/).map((s: string) => ({
-        '@type': 'Person',
-        name: s.trim(),
-      })).filter((p: any) => p.name)
-    }
-    // Link to organizer
-    if (orgs.length > 0) {
-      schema.organizer = { '@type': 'Organization', name: orgs[0].name || domain }
-    }
-    schemas.push(schema)
-  }
-
-  // 8. Products (table 917) — deduplicated
-  const products = await fetchAllRows(TABLE_IDS.geo_products, domain)
-  for (const prod of products) {
-    const schema: any = {
-      '@context': 'https://schema.org',
-      '@type': 'Product',
-      name: prod.name || prod.Name,
-    }
-    if (prod.description) schema.description = prod.description
-    if (prod.category) schema.category = prod.category
-    if (prod.features) {
-      schema.additionalProperty = prod.features.split(/[,;\n]/).map((f: string) => ({
-        '@type': 'PropertyValue',
-        name: 'feature',
-        value: f.trim(),
-      })).filter((p: any) => p.value)
-    }
-    if (prod.pricing) {
-      schema.offers = { '@type': 'Offer', price: prod.pricing, priceCurrency: 'EUR' }
-    }
-    if (prod.source_url) schema.url = prod.source_url
     schemas.push(schema)
   }
 
@@ -310,14 +266,19 @@ async function generateSchemaOrg(domain: string) {
     summary[type] = (summary[type] || 0) + 1
   }
 
+  // Generate compact JSON (no pretty-print for embed code — saves ~40% size)
+  const compactJson = JSON.stringify(schemas)
+
   return NextResponse.json({
     domain,
     generated: new Date().toISOString(),
     summary,
     totalSchemas: schemas.length,
+    estimatedSize: `${Math.round(compactJson.length / 1024)} KB`,
     schemas,
-    // Ready-to-embed script tags
-    embedCode: `<script type="application/ld+json">\n${JSON.stringify(schemas, null, 2)}\n</script>`,
+    // Ready-to-embed: compact JSON, place before </body> (NOT in <head>!)
+    embedCode: `<!-- Place before </body>, NOT in <head> -->\n<script type="application/ld+json">${compactJson}</script>`,
+    embedCodePretty: `<script type="application/ld+json">\n${JSON.stringify(schemas, null, 2)}\n</script>`,
   })
 }
 
