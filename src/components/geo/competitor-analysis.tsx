@@ -36,9 +36,39 @@ interface EngineData {
 
 interface Props {
   domain: string
+  projectName?: string
   reportJson?: string | null
   savedCompetitors?: string[]
   onCompetitorsChange?: (competitors: string[]) => void
+}
+
+/**
+ * Detect if a competitor name actually refers to the company itself.
+ * Needed because domain ≠ brand name (e.g. portabiles-hct.de → "Portabiles").
+ */
+function isSelfBrand(competitorName: string, domain: string, projectName?: string): boolean {
+  const comp = competitorName.toLowerCase().trim()
+  if (!comp || comp.length < 2) return false
+
+  // Build brand tokens from domain (strip TLD, split by hyphens/dots)
+  const domainBase = domain.toLowerCase().replace(/\.[^.]+$/, '') // e.g. "portabiles-hct"
+  const domainTokens = domainBase.split(/[-._]/).filter(t => t.length >= 3)
+  const brandPatterns = new Set([domainBase, domain.toLowerCase(), ...domainTokens])
+
+  // Add project name tokens
+  if (projectName) {
+    const nameLower = projectName.toLowerCase()
+    brandPatterns.add(nameLower)
+    nameLower.split(/[\s\-_.]+/).filter(t => t.length >= 3).forEach(t => brandPatterns.add(t))
+  }
+
+  // Check if competitor matches any brand pattern (bidirectional substring)
+  for (const pattern of brandPatterns) {
+    if (pattern.length < 3) continue
+    if (comp.includes(pattern) || pattern.includes(comp)) return true
+  }
+
+  return false
 }
 
 function parseReport(reportJson: string | null | undefined) {
@@ -51,7 +81,7 @@ function parseReport(reportJson: string | null | undefined) {
   }
 }
 
-export function CompetitorAnalysis({ domain, reportJson, savedCompetitors = [], onCompetitorsChange }: Props) {
+export function CompetitorAnalysis({ domain, projectName, reportJson, savedCompetitors = [], onCompetitorsChange }: Props) {
   const [newCompetitor, setNewCompetitor] = useState('')
   const [competitors, setCompetitors] = useState<string[]>(savedCompetitors)
   const [saving, setSaving] = useState(false)
@@ -112,16 +142,21 @@ export function CompetitorAnalysis({ domain, reportJson, savedCompetitors = [], 
 
   const queries = Array.from(queryMap.values())
   const gapQueries = queries.filter(q => {
-    const hasCompetitor = Object.values(q.competitorsMentioned).some(arr => arr.length > 0)
-    return !q.overallBrandMentioned && hasCompetitor
+    // Only count as gap if real (non-self) competitors are mentioned
+    const hasRealCompetitor = Object.values(q.competitorsMentioned).some(
+      arr => arr.some(c => !isSelfBrand(c, domain, projectName))
+    )
+    return !q.overallBrandMentioned && hasRealCompetitor
   })
 
-  // Aggregate all competitor mentions across all engines
+  // Aggregate all competitor mentions across all engines (filter out self-brand)
   const allCompetitorCounts: Record<string, number> = {}
   for (const q of queries) {
     for (const comps of Object.values(q.competitorsMentioned)) {
       for (const c of comps) {
-        allCompetitorCounts[c] = (allCompetitorCounts[c] || 0) + 1
+        if (!isSelfBrand(c, domain, projectName)) {
+          allCompetitorCounts[c] = (allCompetitorCounts[c] || 0) + 1
+        }
       }
     }
   }
@@ -367,7 +402,7 @@ export function CompetitorAnalysis({ domain, reportJson, savedCompetitors = [], 
                 {queries.map((q, i) => {
                   const allComps = new Set<string>()
                   for (const comps of Object.values(q.competitorsMentioned)) {
-                    for (const c of comps) allComps.add(c)
+                    for (const c of comps) { if (!isSelfBrand(c, domain, projectName)) allComps.add(c) }
                   }
                   return (
                     <tr key={i} className={cn("border-b border-gray-50", !q.overallBrandMentioned && allComps.size > 0 && "bg-red-50/50")}>
@@ -427,7 +462,7 @@ export function CompetitorAnalysis({ domain, reportJson, savedCompetitors = [], 
               {gapQueries.map((q, i) => {
                 const allComps = new Set<string>()
                 for (const comps of Object.values(q.competitorsMentioned)) {
-                  for (const c of comps) allComps.add(c)
+                  for (const c of comps) { if (!isSelfBrand(c, domain, projectName)) allComps.add(c) }
                 }
                 return (
                   <div key={i} className="bg-white rounded-lg border border-orange-100 p-3">
