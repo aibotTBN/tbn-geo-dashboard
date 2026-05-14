@@ -694,11 +694,11 @@ export default function ProjectDetailPage() {
 
         {/* Score-Verlauf (Monitoring Phase 2) */}
         {diagnosis && (
-          <ScoreHistory domain={decodedDomain} />
+          <ScoreHistory domain={domain} />
         )}
 
         {/* Monitoring-Einstellungen */}
-        <MonitoringConfig domain={decodedDomain} />
+        <MonitoringConfig domain={domain} />
 
         {/* Knowledge Base */}
         <Card>
