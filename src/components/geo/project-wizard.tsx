@@ -307,8 +307,9 @@ export function ProjectWizard() {
         }).catch(() => {}) // fire-and-forget, user will see it on the page
       }
 
-      // 4. Navigate to project page
-      router.push(`/projekte/${encodeURIComponent(analysis.domain)}`)
+      // 4. Navigate to project page (signal that diagnosis was started)
+      const diagParam = startDiagnosis ? '?diagnosing=true' : ''
+      router.push(`/projekte/${encodeURIComponent(analysis.domain)}${diagParam}`)
     } catch (e) {
       setCreateError((e as Error).message)
     } finally {

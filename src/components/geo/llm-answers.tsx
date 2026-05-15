@@ -125,10 +125,12 @@ function EngineResponse({ engineKey, result, brandTerms }: {
           </span>
         )}
       </div>
-      {summaryText && (
+      {summaryText ? (
         <p className="text-sm text-gray-700 leading-relaxed">
           <HighlightedText text={summaryText} brandTerms={brandTerms} />
         </p>
+      ) : (
+        <p className="text-xs text-gray-400 italic">Antworttext nicht verfügbar — nur Ergebnis (erwähnt/nicht erwähnt) vorhanden</p>
       )}
       {result.sources && result.sources.length > 0 && (
         <div className="mt-2 pt-2 border-t border-gray-200/50">

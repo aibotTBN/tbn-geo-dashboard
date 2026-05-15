@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -101,10 +101,16 @@ const PAGE_OPTIONS = [10, 25, 50, 100]
 export default function ProjectDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const domain = decodeURIComponent(params.domain as string)
+
+  // Detect if we came from the wizard with auto-diagnose
+  const autoStartedDiagnose = searchParams.get('diagnosing') === 'true'
+  const pollRef = useRef<NodeJS.Timeout | null>(null)
 
   const [project, setProject] = useState<ProjectData | null>(null)
   const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null)
+  const [awaitingDiagnosis, setAwaitingDiagnosis] = useState(autoStartedDiagnose)
   const [entityCounts, setEntityCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [diagnosing, setDiagnosing] = useState(false)
@@ -121,6 +127,7 @@ export default function ProjectDetailPage() {
   const [editIndustry, setEditIndustry] = useState('')
   const [editCoreTopics, setEditCoreTopics] = useState('')
   const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
 
   // Knowledge Builder options
@@ -136,6 +143,50 @@ export default function ProjectDetailPage() {
     loadData()
   }, [domain])
 
+  // Poll for diagnosis completion when auto-started from wizard
+  useEffect(() => {
+    if (!awaitingDiagnosis) return
+    const poll = setInterval(async () => {
+      try {
+        const projRes = await fetch('/api/geo/projects')
+        const projects = await projRes.json()
+        const proj = (projects || []).find((p: any) => p.domain === domain)
+        if (proj?.diagnoses?.[0]) {
+          const d = proj.diagnoses[0]
+          let citationEngines = {}
+          let enginesActive = 1
+          let googleAiReadiness = null
+          if (d.reportJson) {
+            try {
+              const raw = typeof d.reportJson === 'string' ? JSON.parse(d.reportJson) : d.reportJson
+              const report = raw?.report
+              citationEngines = report?.citation_engines || {}
+              enginesActive = report?.scores?.breakdown?.citation?.engines_active || 1
+              googleAiReadiness = report?.google_ai_readiness || null
+            } catch (e) { /* ignore */ }
+          }
+          setDiagnosis({ ...d, citationEngines, enginesActive, googleAiReadiness })
+          setReportJsonRaw(d.reportJson || null)
+          setProject(proj)
+          setAwaitingDiagnosis(false)
+          clearInterval(poll)
+          // Clean URL
+          router.replace(`/projekte/${encodeURIComponent(domain)}`, { scroll: false })
+        }
+      } catch { /* keep polling */ }
+    }, 10000) // poll every 10 seconds
+    pollRef.current = poll
+    // Stop after 5 minutes
+    const timeout = setTimeout(() => {
+      clearInterval(poll)
+      setAwaitingDiagnosis(false)
+    }, 5 * 60 * 1000)
+    return () => {
+      clearInterval(poll)
+      clearTimeout(timeout)
+    }
+  }, [awaitingDiagnosis, domain, router])
+
   async function loadData() {
     setLoading(true)
     try {
@@ -148,6 +199,7 @@ export default function ProjectDetailPage() {
         setEditIndustry(proj.industry || '')
         setEditCoreTopics(proj.coreTopics || '')
         setEditName(proj.name || '')
+        setEditDescription(proj.description || '')
         if (proj.diagnoses?.[0]) {
           const d = proj.diagnoses[0]
           // Parse reportJson for multi-engine data
@@ -202,6 +254,7 @@ export default function ProjectDetailPage() {
         body: JSON.stringify({
           domain,
           name: editName,
+          description: editDescription,
           industry: editIndustry,
           coreTopics: editCoreTopics,
         }),
@@ -220,6 +273,7 @@ export default function ProjectDetailPage() {
 
   async function runDiagnose() {
     setDiagnosing(true)
+    setAwaitingDiagnosis(false) // stop any existing polling
     try {
       const res = await fetch('/api/geo/diagnose', {
         method: 'POST',
@@ -408,6 +462,17 @@ export default function ProjectDetailPage() {
                     placeholder="z.B. B2B PR, SaaS, MedTech, Maschinenbau..."
                   />
                   <p className="text-xs text-gray-400 mt-1">Wird für die KI-Diagnose genutzt, um branchenspezifische Fragen zu generieren</p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Beschreibung</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-radar-500 resize-y"
+                    placeholder="Kurze Beschreibung des Unternehmens..."
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Hilft der KI, das Unternehmen besser einzuordnen</p>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Kernthemen / Core Topics</label>
@@ -636,6 +701,19 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
+        {/* Diagnosis running indicator (after wizard auto-start) */}
+        {awaitingDiagnosis && !diagnosis && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-5 py-4 flex items-center gap-4">
+            <Loader2 size={20} className="animate-spin text-blue-600 shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-blue-900">GEO Diagnose läuft…</p>
+              <p className="text-sm text-blue-700">
+                Die erste Diagnose wurde automatisch gestartet. 10 Fragen werden an 4 KI-Engines gesendet — das dauert ca. 2–3 Minuten. Die Ergebnisse erscheinen automatisch.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Score Card */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-1">
@@ -700,13 +778,13 @@ export default function ProjectDetailPage() {
               </Card>
             )}
 
-            {/* Google AI Readiness */}
+            {/* Google AI Readiness (from GEO Diagnosis) */}
             {diagnosis.googleAiReadiness && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Google AI Readiness</CardTitle>
                   <CardDescription>
-                    Bereitschaft für Google AI Überblicke & Gemini
+                    Bereitschaft für Google AI Überblicke & Gemini (aus GEO Diagnose)
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -750,13 +828,11 @@ export default function ProjectDetailPage() {
 
 
         {/* Google Readiness: Schema.org Validierung + PageSpeed SEO-Score */}
-        {diagnosis && (
-          <Card>
-            <CardContent className="pt-6">
-              <GoogleReadinessCheck domain={domain} />
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardContent className="pt-6">
+            <GoogleReadinessCheck domain={domain} />
+          </CardContent>
+        </Card>
 
         {/* MCP-Anfragen Analytics */}
         <McpAnalytics domain={domain} />

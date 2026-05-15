@@ -291,7 +291,7 @@ export function GoogleReadinessCheck({ domain }: { domain: string }) {
             <ScoreRing score={data.readinessScore} size={90} label="Readiness" />
             <div>
               <p className={`text-sm font-semibold ${overallColor.text}`}>{overallColor.label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Google AI Readiness Score</p>
+              <p className="text-xs text-gray-400 mt-0.5">Google Readiness Score</p>
             </div>
           </div>
 

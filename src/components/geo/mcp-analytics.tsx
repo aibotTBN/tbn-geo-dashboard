@@ -96,6 +96,10 @@ export function McpAnalytics({ domain }: { domain: string }) {
   }
 
   if (error) {
+    // Silently hide on server errors (e.g. table not yet migrated)
+    if (error.includes('500') || error.includes('401')) {
+      return null
+    }
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center gap-2 text-red-600 text-sm">
