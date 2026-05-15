@@ -18,6 +18,8 @@ import {
   Settings, Save, ChevronDown, Users2, Link2,
 } from 'lucide-react'
 import Link from 'next/link'
+import { LlmAnswers } from '@/components/geo/llm-answers'
+import { MethodologyPanel } from '@/components/geo/methodology-info'
 
 const ENTITY_ICONS: Record<string, any> = {
   geo_organizations: Building2,
@@ -711,6 +713,37 @@ export default function ProjectDetailPage() {
               </Card>
             )}
           </div>
+        )}
+
+
+        {/* LLM-Ergebnisse: Vollständige Antworten der KI-Systeme */}
+        {diagnosis && reportJsonRaw && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                💬 Ergebnisse von LLM-Suche und Fragen
+              </CardTitle>
+              <CardDescription>
+                Die tatsächlichen Antworten von ChatGPT, Claude, Gemini und Perplexity auf branchenspezifische Fragen
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LlmAnswers
+                reportJson={reportJsonRaw}
+                domain={domain}
+                projectName={project?.name}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Prüfkriterien — Transparenz über die Bewertungsmethodik */}
+        {diagnosis && (
+          <Card>
+            <CardContent className="pt-6">
+              <MethodologyPanel />
+            </CardContent>
+          </Card>
         )}
 
         {/* Score-Verlauf (Monitoring Phase 2) */}
