@@ -5,7 +5,7 @@ import { queryTable, ENTITY_TYPES, TABLE_IDS } from '@/lib/baserow'
 
 /**
  * Fetch ALL rows for a domain+table, paginating if needed.
- * Filters out Rejected entries and deduplicates by name.
+ * Only includes Approved entries and deduplicates by name.
  */
 async function fetchAllRows(tableId: number, domain: string): Promise<any[]> {
   const allRows: any[] = []
@@ -17,7 +17,7 @@ async function fetchAllRows(tableId: number, domain: string): Promise<any[]> {
     page++
   }
   // Filter out rejected
-  const filtered = allRows.filter((r) => r.status?.value !== 'Rejected')
+  const filtered = allRows.filter((r) => r.status?.value === 'Approved')
   // Deduplicate by normalized name
   const seen = new Set<string>()
   return filtered.filter((r) => {

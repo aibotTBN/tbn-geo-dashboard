@@ -76,6 +76,7 @@ export async function queryTable(tableId: number, options: {
   search?: string
   size?: number
   page?: number
+  statusFilter?: 'Approved' | 'Draft' | 'Rejected' | null // Filter by status field value
 } = {}) {
   const token = await getToken()
   const params = new URLSearchParams({
@@ -109,6 +110,11 @@ export async function queryTable(tableId: number, options: {
     if (!fieldIds['project_domain']) {
       rows = rows.filter((r: any) => (r.project_domain || '').includes(options.domain!))
     }
+  }
+
+  // Client-side status filter (Baserow single-select fields use { value, id, color })
+  if (options.statusFilter) {
+    rows = rows.filter((r: any) => r.status?.value === options.statusFilter)
   }
 
   return { rows, count: data.count, totalPages: Math.ceil(data.count / (options.size || 200)) }
