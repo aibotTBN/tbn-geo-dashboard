@@ -20,6 +20,7 @@ import {
 import Link from 'next/link'
 import { LlmAnswers } from '@/components/geo/llm-answers'
 import { MethodologyPanel } from '@/components/geo/methodology-info'
+import { GoogleReadinessCheck } from '@/components/geo/google-readiness'
 
 const ENTITY_ICONS: Record<string, any> = {
   geo_organizations: Building2,
@@ -742,6 +743,16 @@ export default function ProjectDetailPage() {
           <Card>
             <CardContent className="pt-6">
               <MethodologyPanel />
+            </CardContent>
+          </Card>
+        )}
+
+
+        {/* Google Readiness: Schema.org Validierung + PageSpeed SEO-Score */}
+        {diagnosis && (
+          <Card>
+            <CardContent className="pt-6">
+              <GoogleReadinessCheck domain={domain} />
             </CardContent>
           </Card>
         )}
