@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Globe, ArrowRight, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Project {
   id: string
@@ -25,6 +26,7 @@ export default function ProjektePage() {
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const router = useRouter()
 
   useEffect(() => {
     fetchProjects()
@@ -72,35 +74,11 @@ export default function ProjektePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Alle Projekte</CardTitle>
-            <Button onClick={() => setShowForm(!showForm)} size="sm">
+            <Button onClick={() => router.push('/projekte/neu')} size="sm">
               <Plus size={16} className="mr-1" /> Neues Projekt
             </Button>
           </CardHeader>
-          {showForm && (
-            <CardContent className="border-t">
-              <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                <input
-                  type="text"
-                  placeholder="Domain (z.B. example.de)"
-                  value={newDomain}
-                  onChange={(e) => setNewDomain(e.target.value)}
-                  className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-radar-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Firmenname (optional)"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="flex-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-radar-500"
-                />
-                <Button onClick={createProject} disabled={creating || !newDomain}>
-                  {creating ? <Loader2 size={16} className="animate-spin mr-1" /> : null}
-                  Anlegen
-                </Button>
-              </div>
-              {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
-            </CardContent>
-          )}
+
           <CardContent>
             {loading ? (
               <div className="flex justify-center py-8">
