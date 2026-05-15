@@ -21,6 +21,7 @@ import Link from 'next/link'
 import { LlmAnswers } from '@/components/geo/llm-answers'
 import { MethodologyPanel } from '@/components/geo/methodology-info'
 import { GoogleReadinessCheck } from '@/components/geo/google-readiness'
+import { McpAnalytics } from '@/components/geo/mcp-analytics'
 
 const ENTITY_ICONS: Record<string, any> = {
   geo_organizations: Building2,
@@ -756,6 +757,9 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* MCP-Anfragen Analytics */}
+        <McpAnalytics domain={domain} />
 
         {/* Score-Verlauf (Monitoring Phase 2) */}
         {diagnosis && (

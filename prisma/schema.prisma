@@ -100,3 +100,17 @@ model WaitlistEntry {
   source    String   @default("landing_page")
   createdAt DateTime @default(now())
 }
+
+// MCP Request Analytics — logs every external AI query to the Knowledge API
+model McpRequest {
+  id        String   @id @default(cuid())
+  domain    String   // Which project domain was queried
+  tool      String   // MCP tool name (search, get_entity, list_services etc.)
+  engine    String   @default("Unknown") // Detected AI engine from User-Agent
+  userAgent String   @default("") @db.Text
+  sourceIp  String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([domain, createdAt])
+  @@index([domain, engine])
+}
