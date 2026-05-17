@@ -168,5 +168,18 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
-  debug: process.env.NODE_ENV === 'development',
+  // Temporarily enabled for debugging — set to false after fixing OAuth
+  debug: true,
+
+  logger: {
+    error(code, metadata) {
+      console.error('[NextAuth Error]', code, JSON.stringify(metadata, null, 2))
+    },
+    warn(code) {
+      console.warn('[NextAuth Warn]', code)
+    },
+    debug(code, metadata) {
+      console.log('[NextAuth Debug]', code, JSON.stringify(metadata, null, 2))
+    },
+  },
 }
