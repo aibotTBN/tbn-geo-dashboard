@@ -3,8 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 /**
- * Google Readiness API — combines PageSpeed Insights + Schema.org validation.
+ * Google Readiness API — Schema.org validation + optional PageSpeed Insights.
  * Runs independently of the n8n diagnose workflow.
+ * 
+ * PageSpeed requires GOOGLE_PAGESPEED_API_KEY env var (free, 25k queries/day).
+ * Without it, only Schema.org validation runs.
  * 
  * GET /api/geo/google-readiness?domain=example.com
  */
@@ -185,18 +188,23 @@ async function validateSchema(domain: string): Promise<SchemaValidation> {
 
 /**
  * Fetch Google PageSpeed Insights data.
+ * Returns null if no API key is configured or if the API fails.
  */
 async function fetchPageSpeed(domain: string): Promise<PageSpeedData | null> {
+  const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY
+  if (!apiKey) {
+    // No API key configured — skip PageSpeed silently
+    return null
+  }
+
   try {
     const url = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?` +
       `url=https://${encodeURIComponent(domain)}` +
       `&strategy=mobile` +
-      `&category=seo&category=performance&category=best-practices&category=accessibility`
+      `&category=seo&category=performance&category=best-practices&category=accessibility` +
+      `&key=${apiKey}`
 
-    const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY
-    const fullUrl = apiKey ? `${url}&key=${apiKey}` : url
-
-    const resp = await fetch(fullUrl, {
+    const resp = await fetch(url, {
       signal: AbortSignal.timeout(60000),
     })
 
@@ -292,38 +300,57 @@ export async function GET(request: NextRequest) {
 
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 })
 
-  // Run both checks in parallel
+  // Check if PageSpeed API key is available
+  const hasPageSpeedKey = !!process.env.GOOGLE_PAGESPEED_API_KEY
+
+  // Run checks (PageSpeed only if API key is configured)
   const [schemaValidation, pageSpeed] = await Promise.all([
     validateSchema(domain),
-    fetchPageSpeed(domain),
+    hasPageSpeedKey ? fetchPageSpeed(domain) : Promise.resolve(null),
   ])
 
   // Calculate combined readiness score (0-100)
   let readinessScore = 0
 
-  // Schema.org contribution (max 40 points)
-  if (schemaValidation.count > 0) {
-    readinessScore += 10 // Has any schema
-    if (schemaValidation.valid) readinessScore += 5
-    // Points per important type (up to 25 more)
-    const importantTypes = ['Organization', 'LocalBusiness', 'WebSite', 'FAQPage', 'Article', 'BlogPosting', 'Service', 'Product', 'Person', 'BreadcrumbList']
-    const foundImportant = schemaValidation.types.filter(t => importantTypes.includes(t))
-    readinessScore += Math.min(foundImportant.length * 5, 25)
-  }
-
-  // PageSpeed SEO contribution (max 30 points)
   if (pageSpeed) {
+    // --- Full mode: Schema (40) + PageSpeed SEO (30) + Performance (20) + Accessibility (10) ---
+
+    // Schema.org contribution (max 40 points)
+    if (schemaValidation.count > 0) {
+      readinessScore += 10
+      if (schemaValidation.valid) readinessScore += 5
+      const importantTypes = ['Organization', 'LocalBusiness', 'WebSite', 'FAQPage', 'Article', 'BlogPosting', 'Service', 'Product', 'Person', 'BreadcrumbList']
+      const foundImportant = schemaValidation.types.filter(t => importantTypes.includes(t))
+      readinessScore += Math.min(foundImportant.length * 5, 25)
+    }
+
+    // PageSpeed SEO (max 30)
     readinessScore += Math.round(pageSpeed.seoScore * 0.3)
-  }
 
-  // PageSpeed Performance contribution (max 20 points)
-  if (pageSpeed) {
+    // Performance (max 20)
     readinessScore += Math.round(pageSpeed.performanceScore * 0.2)
-  }
 
-  // Accessibility bonus (max 10 points)
-  if (pageSpeed) {
+    // Accessibility (max 10)
     readinessScore += Math.round(pageSpeed.accessibilityScore * 0.1)
+  } else {
+    // --- Schema-only mode: Score out of 100 based purely on Schema.org quality ---
+
+    if (schemaValidation.count > 0) {
+      readinessScore += 20 // Has any schema at all
+      if (schemaValidation.valid) readinessScore += 10 // No errors
+
+      // Points per important schema type (max 50)
+      const importantTypes = ['Organization', 'LocalBusiness', 'WebSite', 'FAQPage', 'Article', 'BlogPosting', 'Service', 'Product', 'Person', 'BreadcrumbList']
+      const foundImportant = schemaValidation.types.filter(t => importantTypes.includes(t))
+      readinessScore += Math.min(foundImportant.length * 10, 50)
+
+      // Quality bonus: few warnings relative to schema count (max 20)
+      const warningRatio = schemaValidation.warnings.length / Math.max(schemaValidation.count, 1)
+      if (warningRatio === 0) readinessScore += 20
+      else if (warningRatio < 1) readinessScore += 10
+      else if (warningRatio < 2) readinessScore += 5
+    }
+    // If no schemas at all, score stays 0
   }
 
   return NextResponse.json({
@@ -331,6 +358,7 @@ export async function GET(request: NextRequest) {
     readinessScore: Math.min(readinessScore, 100),
     schema: schemaValidation,
     pageSpeed,
+    pageSpeedAvailable: hasPageSpeedKey,
     checkedAt: new Date().toISOString(),
   })
 }

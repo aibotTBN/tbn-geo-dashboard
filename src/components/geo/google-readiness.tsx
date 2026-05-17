@@ -51,6 +51,7 @@ interface GoogleReadinessData {
   readinessScore: number
   schema: SchemaData
   pageSpeed: PageSpeedData | null
+  pageSpeedAvailable?: boolean
   checkedAt: string
 }
 
@@ -203,10 +204,10 @@ export function GoogleReadinessCheck({ domain }: { domain: string }) {
           <div>
             <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
               <Globe2 size={18} className="text-blue-600" />
-              Google Readiness Check
+              Schema.org &amp; Google Readiness
             </h3>
             <p className="text-sm text-gray-500 mt-0.5">
-              Schema.org Validierung + PageSpeed SEO-Score für {domain}
+              Schema.org Validierung für {domain}
             </p>
           </div>
           <button
@@ -221,10 +222,10 @@ export function GoogleReadinessCheck({ domain }: { domain: string }) {
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
           <Globe2 size={40} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm text-gray-500">
-            Prüft Ihre Website auf Schema.org Markup, Google PageSpeed SEO-Score, Core Web Vitals und weitere Google-relevante Faktoren.
+            Prüft das Schema.org Markup Ihrer Website — die Basis für die Sichtbarkeit in Google AI Overviews und anderen KI-Systemen.
           </p>
           <p className="text-xs text-gray-400 mt-2">
-            Dauert ca. 15–30 Sekunden
+            Dauert ca. 5–15 Sekunden
           </p>
         </div>
 
@@ -243,12 +244,12 @@ export function GoogleReadinessCheck({ domain }: { domain: string }) {
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Globe2 size={18} className="text-blue-600" />
-          <h3 className="text-base font-semibold text-gray-900">Google Readiness Check</h3>
+          <h3 className="text-base font-semibold text-gray-900">Schema.org &amp; Google Readiness</h3>
         </div>
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-8 text-center">
           <Loader2 size={32} className="mx-auto text-blue-600 animate-spin mb-3" />
           <p className="text-sm font-medium text-blue-800">Analyse läuft…</p>
-          <p className="text-xs text-blue-600 mt-1">PageSpeed API & Schema.org Validierung</p>
+          <p className="text-xs text-blue-600 mt-1">Schema.org Validierung</p>
         </div>
       </div>
     )
@@ -268,7 +269,7 @@ export function GoogleReadinessCheck({ domain }: { domain: string }) {
         <div>
           <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
             <Globe2 size={18} className="text-blue-600" />
-            Google Readiness Check
+            Schema.org {ps ? '& Google Readiness' : 'Validierung'}
           </h3>
           <p className="text-xs text-gray-400 mt-0.5">
             Geprüft am {new Date(data.checkedAt).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -288,24 +289,26 @@ export function GoogleReadinessCheck({ domain }: { domain: string }) {
         <div className="flex items-center gap-6 flex-wrap">
           {/* Overall Readiness Score */}
           <div className="flex items-center gap-4">
-            <ScoreRing score={data.readinessScore} size={90} label="Readiness" />
+            <ScoreRing score={data.readinessScore} size={90} label={ps ? 'Readiness' : 'Schema Score'} />
             <div>
               <p className={`text-sm font-semibold ${overallColor.text}`}>{overallColor.label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Google Readiness Score</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {ps ? 'Google Readiness Score' : 'Schema.org Qualität'}
+              </p>
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="h-16 w-px bg-gray-200 hidden sm:block" />
-
-          {/* PageSpeed Scores */}
+          {/* Divider + PageSpeed Scores (only when available) */}
           {ps && (
-            <div className="flex items-center gap-4">
-              <ScoreRing score={ps.seoScore} size={70} label="SEO" />
-              <ScoreRing score={ps.performanceScore} size={70} label="Performance" />
-              <ScoreRing score={ps.accessibilityScore} size={70} label="Accessibility" />
-              <ScoreRing score={ps.bestPracticesScore} size={70} label="Best Practices" />
-            </div>
+            <>
+              <div className="h-16 w-px bg-gray-200 hidden sm:block" />
+              <div className="flex items-center gap-4">
+                <ScoreRing score={ps.seoScore} size={70} label="SEO" />
+                <ScoreRing score={ps.performanceScore} size={70} label="Performance" />
+                <ScoreRing score={ps.accessibilityScore} size={70} label="Accessibility" />
+                <ScoreRing score={ps.bestPracticesScore} size={70} label="Best Practices" />
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -470,13 +473,6 @@ export function GoogleReadinessCheck({ domain }: { domain: string }) {
               </p>
             </div>
           )}
-        </div>
-      )}
-
-      {/* PageSpeed not available */}
-      {!ps && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-700">
-          <AlertTriangle size={14} className="inline mr-1" /> PageSpeed Insights-Daten konnten nicht abgerufen werden. Nur Schema.org-Validierung verfügbar.
         </div>
       )}
 
