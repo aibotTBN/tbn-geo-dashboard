@@ -1,12 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Radar, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-radar-50 via-white to-blue-50">
+        <div className="animate-pulse text-gray-400">Laden…</div>
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
+  )
+}
+
+function ResetPasswordForm() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
 

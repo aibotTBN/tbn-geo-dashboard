@@ -1,10 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Radar, Eye, EyeOff, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-radar-50 via-white to-blue-50">
+        <div className="animate-pulse text-gray-400">Laden…</div>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
+  )
+}
 
 const PLANS = [
   {
@@ -38,7 +50,7 @@ const PLANS = [
   },
 ]
 
-export default function RegisterPage() {
+function RegisterForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const preselectedPlan = searchParams.get('plan')?.toUpperCase() || ''
