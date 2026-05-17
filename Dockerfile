@@ -6,8 +6,9 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install deps first (cacheable layer — only invalidated by package.json changes)
+# --ignore-scripts skips postinstall (prisma generate) since schema isn't copied yet
 COPY package.json package-lock.json* ./
-RUN npm install --prefer-offline --no-audit --no-fund
+RUN npm install --prefer-offline --no-audit --no-fund --ignore-scripts
 
 # Copy prisma schema & generate client (separate layer — fast, low RAM)
 COPY prisma ./prisma/
