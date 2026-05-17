@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { sendPasswordResetEmail } from '@/lib/email'
 import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
@@ -28,11 +29,11 @@ export async function POST(request: NextRequest) {
         data: { email: normalizedEmail, token, expires },
       })
 
-      // TODO: Send email with reset link
-      // const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${token}`
-      // await sendPasswordResetEmail(normalizedEmail, resetUrl)
-
-      console.log(`[Auth] Password reset token for ${normalizedEmail}: ${token}`)
+      // Send email (falls back to console.log if Resend not configured)
+      const sent = await sendPasswordResetEmail(normalizedEmail, token)
+      if (!sent) {
+        console.log(`[Auth] Password reset token for ${normalizedEmail} (email not sent, check RESEND_API_KEY)`)
+      }
     }
 
     // Always return success (privacy)

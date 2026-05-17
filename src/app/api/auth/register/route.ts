@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { sendVerificationEmail, sendWelcomeEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
@@ -78,10 +79,6 @@ export async function POST(request: NextRequest) {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12)
 
-    // Generate email verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex')
-    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -92,37 +89,45 @@ export async function POST(request: NextRequest) {
         plan: userPlan,
         planExpiresAt: planExpiry,
         inviteCode: usedInviteCode,
-        // emailVerified is null until they click the verification link
       },
     })
 
-    // Store verification token
-    await prisma.verificationToken.create({
-      data: {
-        identifier: normalizedEmail,
-        token: verificationToken,
-        expires: verificationExpiry,
-      },
-    })
+    // Email verification flow
+    const hasEmailSystem = !!process.env.RESEND_API_KEY
+    let autoVerified = false
 
-    // TODO: Send verification email via Resend/Mailgun
-    // For now, auto-verify in development or log the token
-    if (process.env.NODE_ENV !== 'production' || !process.env.EMAIL_FROM) {
-      // Auto-verify in development or when email isn't configured
+    if (hasEmailSystem) {
+      // Send verification email
+      const verificationToken = crypto.randomBytes(32).toString('hex')
+      await prisma.verificationToken.create({
+        data: {
+          identifier: normalizedEmail,
+          token: verificationToken,
+          expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
+        },
+      })
+      await sendVerificationEmail(normalizedEmail, verificationToken)
+    } else {
+      // Auto-verify when email system is not configured
       await prisma.user.update({
         where: { id: user.id },
         data: { emailVerified: new Date() },
       })
-      console.log(`[Auth] Auto-verified user ${normalizedEmail} (email system not configured)`)
-    } else {
-      console.log(`[Auth] Verification token for ${normalizedEmail}: ${verificationToken}`)
-      // TODO: sendVerificationEmail(normalizedEmail, verificationToken)
+      autoVerified = true
+      console.log(`[Auth] Auto-verified ${normalizedEmail} (RESEND_API_KEY not set)`)
+    }
+
+    // Send welcome email (best-effort, don't fail registration)
+    if (hasEmailSystem) {
+      await sendWelcomeEmail(normalizedEmail, name, userPlan).catch(() => {})
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Konto erstellt. Bitte bestätigen Sie Ihre E-Mail-Adresse.',
-      autoVerified: process.env.NODE_ENV !== 'production' || !process.env.EMAIL_FROM,
+      message: autoVerified
+        ? 'Konto erstellt. Sie können sich jetzt anmelden.'
+        : 'Konto erstellt. Bitte bestätigen Sie Ihre E-Mail-Adresse.',
+      autoVerified,
     })
   } catch (error: any) {
     console.error('[Auth] Registration error:', error)
