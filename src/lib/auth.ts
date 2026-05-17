@@ -57,6 +57,8 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Allow linking even if email already exists from another provider
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
 
@@ -67,28 +69,53 @@ export const authOptions: NextAuthOptions = {
         const email = user.email || ''
         const domain = email.split('@')[1]
         if (domain !== 'tbnpr.de') {
+          console.log(`[Auth] Google sign-in rejected: ${email} (not @tbnpr.de)`)
           return false
         }
+
         // Auto-set TBN_STAFF role for @tbnpr.de Google logins
-        if (user.id) {
-          const existingUser = await prisma.user.findUnique({ where: { id: user.id } })
-          if (existingUser && existingUser.role === 'USER') {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { role: 'TBN_STAFF', plan: 'PRO' },
-            })
+        try {
+          if (user.id) {
+            const existingUser = await prisma.user.findUnique({ where: { id: user.id } })
+            if (existingUser && existingUser.role === 'USER') {
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { role: 'TBN_STAFF', plan: 'PRO' },
+              })
+              console.log(`[Auth] Auto-upgraded ${email} to TBN_STAFF/PRO`)
+            }
           }
+        } catch (error) {
+          // Don't block sign-in if role update fails
+          console.error('[Auth] Error updating role during sign-in:', error)
         }
       }
       return true
     },
 
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, account, trigger, session }) {
       // Initial sign-in: add user data to token
       if (user) {
         token.id = user.id
         token.role = (user as any).role || 'USER'
         token.plan = (user as any).plan || null
+      }
+
+      // For OAuth providers: the user object from the adapter might not have
+      // custom fields. Fetch from DB to be sure.
+      if (account?.provider === 'google' && token.sub) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.sub },
+          })
+          if (dbUser) {
+            token.id = dbUser.id
+            token.role = dbUser.role
+            token.plan = dbUser.plan
+          }
+        } catch (error) {
+          console.error('[Auth] Error fetching user in jwt callback:', error)
+        }
       }
 
       // When session is updated (e.g., plan change)
@@ -97,25 +124,24 @@ export const authOptions: NextAuthOptions = {
         if (session.plan !== undefined) token.plan = session.plan
       }
 
-      // For Google sign-in: fetch role/plan from DB (adapter creates user first)
-      if (token.id && !token.role) {
-        const dbUser = await prisma.user.findUnique({ where: { id: token.id as string } })
-        if (dbUser) {
-          token.role = dbUser.role
-          token.plan = dbUser.plan
-        }
-      }
-
       return token
     },
 
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id
+        (session.user as any).id = token.id || token.sub
         ;(session.user as any).role = token.role || 'USER'
         ;(session.user as any).plan = token.plan || null
       }
       return session
+    },
+
+    async redirect({ url, baseUrl }) {
+      // Handle relative URLs
+      if (url.startsWith('/')) return `${baseUrl}${url}`
+      // Allow callbacks to same origin
+      if (new URL(url).origin === baseUrl) return url
+      return baseUrl + '/dashboard'
     },
   },
 
@@ -129,11 +155,18 @@ export const authOptions: NextAuthOptions = {
       // Auto-set TBN_STAFF for @tbnpr.de emails (Google OAuth creates user via adapter)
       const email = user.email || ''
       if (email.endsWith('@tbnpr.de')) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { role: 'TBN_STAFF', plan: 'PRO' },
-        })
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { role: 'TBN_STAFF', plan: 'PRO' },
+          })
+          console.log(`[Auth] New TBN user created: ${email} → TBN_STAFF/PRO`)
+        } catch (error) {
+          console.error('[Auth] Error setting TBN_STAFF role for new user:', error)
+        }
       }
     },
   },
+
+  debug: process.env.NODE_ENV === 'development',
 }

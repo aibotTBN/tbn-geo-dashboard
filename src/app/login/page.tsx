@@ -28,12 +28,20 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const errorMessages: Record<string, string> = {
+    CredentialsSignin: 'Ungültige Anmeldedaten',
+    OAuthAccountNotLinked: 'Diese E-Mail ist bereits mit einem anderen Login verknüpft',
+    OAuthCallback: 'Fehler bei der Google-Authentifizierung',
+    OAuthCreateAccount: 'Konto konnte nicht erstellt werden',
+    OAuthSignin: 'Google-Anmeldung fehlgeschlagen',
+    Callback: 'Authentifizierungsfehler',
+    Default: 'Ein Fehler ist aufgetreten',
+  }
+
   const [error, setError] = useState(
-    errorParam === 'CredentialsSignin'
-      ? 'Ungültige Anmeldedaten'
-      : errorParam
-        ? 'Ein Fehler ist aufgetreten'
-        : ''
+    errorParam
+      ? errorMessages[errorParam] || `Fehler: ${errorParam}`
+      : ''
   )
 
   async function handleCredentialsLogin(e: React.FormEvent) {
