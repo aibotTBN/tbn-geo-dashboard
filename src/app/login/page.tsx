@@ -1,13 +1,53 @@
 'use client'
 
+import { useState } from 'react'
 import { signIn } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Radar } from 'lucide-react'
+import { Radar, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import Link from 'next/link'
 
 export default function LoginPage() {
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+  const errorParam = searchParams.get('error')
+
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(
+    errorParam === 'CredentialsSignin'
+      ? 'Ungültige Anmeldedaten'
+      : errorParam
+        ? 'Ein Fehler ist aufgetreten'
+        : ''
+  )
+
+  async function handleCredentialsLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    const result = await signIn('credentials', {
+      email,
+      password,
+      redirect: false,
+      callbackUrl,
+    })
+
+    if (result?.error) {
+      setError(result.error === 'CredentialsSignin' ? 'Ungültige Anmeldedaten' : result.error)
+      setLoading(false)
+    } else if (result?.url) {
+      window.location.href = result.url
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-radar-50 via-white to-blue-50">
       <div className="w-full max-w-md p-8">
+        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-radar-600 text-white mb-4">
             <Radar size={36} />
@@ -16,13 +56,93 @@ export default function LoginPage() {
           <p className="text-gray-500 mt-2">KI-Sichtbarkeit managen</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-          <p className="text-sm text-gray-600 text-center mb-6">
-            Melden Sie sich mit Ihrem TBN Google-Konto an.
-          </p>
+        {/* Login Form */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 space-y-6">
+          {/* Error message */}
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+              <AlertCircle size={16} />
+              {error}
+            </div>
+          )}
+
+          {/* Email + Password */}
+          <form onSubmit={handleCredentialsLogin} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                E-Mail
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-radar-500 focus:border-radar-500 outline-none"
+                placeholder="ihre@email.de"
+                required
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                Passwort
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-radar-500 focus:border-radar-500 outline-none"
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-radar-600 hover:bg-radar-700"
+              size="lg"
+              disabled={loading}
+            >
+              {loading ? 'Anmelden…' : 'Anmelden'}
+            </Button>
+          </form>
+
+          {/* Links */}
+          <div className="flex items-center justify-between text-sm">
+            <Link href="/register" className="text-radar-600 hover:text-radar-700 font-medium">
+              Konto erstellen
+            </Link>
+            <Link href="/forgot-password" className="text-gray-500 hover:text-gray-700">
+              Passwort vergessen?
+            </Link>
+          </div>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="px-2 bg-white text-gray-400">TBN-Mitarbeiter</span>
+            </div>
+          </div>
+
+          {/* Google Login (TBN only) */}
           <Button
-            onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-            className="w-full bg-radar-600 hover:bg-radar-700"
+            onClick={() => signIn('google', { callbackUrl })}
+            variant="outline"
+            className="w-full"
             size="lg"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -45,6 +165,9 @@ export default function LoginPage() {
             </svg>
             Mit Google anmelden
           </Button>
+          <p className="text-xs text-gray-400 text-center">
+            Nur für Mitarbeiter mit @tbnpr.de E-Mail
+          </p>
         </div>
 
         <p className="text-xs text-gray-400 text-center mt-6">

@@ -20,6 +20,16 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     redirect('/login')
   }
 
+  // Check if user has an active plan (TBN_STAFF and ADMIN always have access)
+  const role = (session.user as any)?.role
+  const plan = (session.user as any)?.plan
+  const isStaff = role === 'TBN_STAFF' || role === 'ADMIN'
+
+  if (!isStaff && !plan) {
+    // User registered but has no plan — redirect to plan selection
+    redirect('/register?from=no-plan')
+  }
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />

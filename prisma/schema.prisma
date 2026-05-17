@@ -7,7 +7,20 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// NextAuth models
+// ─── Enums ───────────────────────────────────────────────────────────
+enum Role {
+  USER
+  TBN_STAFF
+  ADMIN
+}
+
+enum Plan {
+  STARTER
+  PRO
+  MANAGED
+}
+
+// ─── NextAuth models ─────────────────────────────────────────────────
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -35,14 +48,21 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  role          String    @default("viewer") // admin, editor, viewer
-  accounts      Account[]
-  sessions      Session[]
+  id              String    @id @default(cuid())
+  name            String?
+  email           String?   @unique
+  emailVerified   DateTime?
+  image           String?
+  passwordHash    String?            // null for Google-only auth (TBN staff)
+  role            Role      @default(USER)
+  plan            Plan?              // null = no active plan (shouldn't happen for registered users)
+  stripeCustomerId String?  @unique
+  stripeSubId     String?            // active Stripe Subscription ID
+  planExpiresAt   DateTime?          // for invite-based plans with expiry
+  inviteCode      String?            // which invite code was used
+  accounts        Account[]
+  sessions        Session[]
+  projects        Project[]
 }
 
 model VerificationToken {
@@ -53,7 +73,32 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// LLM Radar project tracking
+// ─── Password Reset ──────────────────────────────────────────────────
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// ─── Invite Links ────────────────────────────────────────────────────
+model InviteLink {
+  id        String   @id @default(cuid())
+  code      String   @unique       // e.g. "BETA-PRO-2026-xyz"
+  plan      Plan                    // which plan gets activated
+  maxUses   Int      @default(1)   // 1 = single invitation
+  usedCount Int      @default(0)
+  expiresAt DateTime?
+  note      String?               // "Für Kunde XYZ"
+  createdBy String                // Admin User-ID
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// ─── LLM Radar project tracking ─────────────────────────────────────
 model Project {
   id          String   @id @default(cuid())
   domain      String   @unique
@@ -62,6 +107,8 @@ model Project {
   industry    String?  // e.g. "B2B PR", "SaaS", "MedTech"
   coreTopics  String?  @db.Text // Comma-separated core topics
   pagesCrawled Int     @default(0) // Track how many pages have been crawled
+  userId      String?  // Owner of the project (null for legacy projects)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   // Monitoring settings
   monitoringEnabled  Boolean  @default(false)
@@ -75,6 +122,8 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   diagnoses   Diagnosis[]
+
+  @@index([userId])
 }
 
 model Diagnosis {

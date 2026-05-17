@@ -16,7 +16,9 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  Shield,
 } from 'lucide-react'
+import { PLAN_NAMES } from '@/lib/plan-limits'
 
 const mainNav = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -31,6 +33,10 @@ export function Sidebar() {
   const { data: session } = useSession()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const userRole = (session?.user as any)?.role
+  const userPlan = (session?.user as any)?.plan
+  const isStaffOrAdmin = userRole === 'TBN_STAFF' || userRole === 'ADMIN'
 
   useEffect(() => {
     setMobileOpen(false)
@@ -94,6 +100,27 @@ export function Sidebar() {
               </Link>
             )
           })}
+
+          {/* Admin link for TBN staff and admins */}
+          {isStaffOrAdmin && (
+            <>
+              <div className={cn('my-3 border-t border-gray-100', collapsed && 'mx-0')} />
+              <Link
+                href="/admin"
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  pathname === '/admin'
+                    ? 'bg-radar-50 text-radar-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                  collapsed && 'justify-center px-2'
+                )}
+                title={collapsed ? 'Admin' : undefined}
+              >
+                <Shield size={20} className={pathname === '/admin' ? 'text-radar-600' : ''} />
+                {!collapsed && 'Admin'}
+              </Link>
+            </>
+          )}
         </nav>
 
         {/* Collapse toggle */}
@@ -111,12 +138,18 @@ export function Sidebar() {
         {session?.user && !collapsed && (
           <div className="px-4 py-3 border-t border-gray-100">
             <div className="flex items-center gap-3">
-              {session.user.image && (
+              {session.user.image ? (
                 <img src={session.user.image} alt="" className="w-8 h-8 rounded-full" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-radar-100 flex items-center justify-center text-radar-600 font-medium text-sm">
+                  {(session.user.name || session.user.email || '?')[0].toUpperCase()}
+                </div>
               )}
               <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-700 truncate">{session.user.name}</p>
-                <p className="text-xs text-gray-400 truncate">{session.user.email}</p>
+                <p className="text-sm font-medium text-gray-700 truncate">{session.user.name || session.user.email}</p>
+                <p className="text-xs text-gray-400 truncate">
+                  {isStaffOrAdmin ? 'TBN Team' : PLAN_NAMES[userPlan] || 'Kein Plan'}
+                </p>
               </div>
             </div>
           </div>
