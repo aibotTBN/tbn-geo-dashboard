@@ -5,10 +5,13 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install deps first (cacheable layer)
+# Install deps first (cacheable layer — only invalidated by package.json changes)
 COPY package.json package-lock.json* ./
+RUN npm install --prefer-offline --no-audit --no-fund
+
+# Copy prisma schema & generate client (separate layer — fast, low RAM)
 COPY prisma ./prisma/
-RUN npm install && npx prisma generate
+RUN npx prisma generate
 
 # Copy source and build with limited memory
 COPY . .
@@ -43,6 +46,9 @@ COPY --from=builder /app/node_modules/.bin ./node_modules/.bin
 # Copy entrypoint script
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
+
+# Copy pre-migration script
+COPY --from=builder /app/prisma/pre-migrate.mjs ./prisma/pre-migrate.mjs
 
 RUN chown -R nextjs:nodejs .
 
