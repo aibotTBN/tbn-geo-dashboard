@@ -60,6 +60,8 @@ model User {
   stripeSubId     String?            // active Stripe Subscription ID
   planExpiresAt   DateTime?          // for invite-based plans with expiry
   inviteCode      String?            // which invite code was used
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   accounts        Account[]
   sessions        Session[]
   projects        Project[]
