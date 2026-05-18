@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { ChevronDown, ChevronUp, Search, Filter, CheckCircle2, XCircle, MessageSquare, Eye, EyeOff } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Filter, CheckCircle2, XCircle, MessageSquare, Eye, EyeOff, Quote } from 'lucide-react'
 
 /**
  * Engine metadata for display.
@@ -11,9 +11,10 @@ const ENGINE_META: Record<string, { label: string; color: string; bg: string; bo
   claude: { label: 'Claude', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', icon: '🟠' },
   gemini: { label: 'Gemini', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', icon: '🔵' },
   perplexity: { label: 'Perplexity', color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200', icon: '🟣' },
+  google_ai_overview: { label: 'Google AI', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200', icon: '🔴' },
 }
 
-const ENGINE_ORDER = ['openai', 'claude', 'gemini', 'perplexity']
+const ENGINE_ORDER = ['openai', 'claude', 'gemini', 'perplexity', 'google_ai_overview']
 
 interface QueryResult {
   query: string
@@ -38,62 +39,62 @@ interface LlmAnswersProps {
 }
 
 /**
- * Highlight brand/domain mentions in text.
+ * Extract a snippet: 10 words before and after the first brand mention.
+ * Returns null if brand not found in text.
  */
-function HighlightedText({ text, brandTerms, competitorTerms }: {
-  text: string
-  brandTerms: string[]
-  competitorTerms?: string[]
-}) {
+function extractBrandSnippet(text: string, brandTerms: string[]): { before: string; match: string; after: string } | null {
   if (!text) return null
 
-  // Build regex for brand terms
-  const allBrandPatterns = brandTerms.filter(Boolean).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  const allCompPatterns = (competitorTerms || []).filter(Boolean).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  
-  if (allBrandPatterns.length === 0 && allCompPatterns.length === 0) {
-    return <span>{text}</span>
-  }
+  // Find the first brand term match
+  for (const term of brandTerms) {
+    if (!term || term.length < 2) continue
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const regex = new RegExp(escaped, 'gi')
+    const match = regex.exec(text)
+    if (match) {
+      const matchStart = match.index
+      const matchEnd = matchStart + match[0].length
 
-  const patterns: { regex: RegExp; type: 'brand' | 'competitor' }[] = []
-  if (allBrandPatterns.length > 0) {
-    patterns.push({ regex: new RegExp(`(${allBrandPatterns.join('|')})`, 'gi'), type: 'brand' })
-  }
-  if (allCompPatterns.length > 0) {
-    patterns.push({ regex: new RegExp(`(${allCompPatterns.join('|')})`, 'gi'), type: 'competitor' })
-  }
+      // Get text before and after
+      const beforeText = text.substring(0, matchStart)
+      const afterText = text.substring(matchEnd)
 
-  // Simple approach: split on brand terms first, then check for competitors
-  const combinedPatterns = [...allBrandPatterns, ...allCompPatterns]
-  if (combinedPatterns.length === 0) return <span>{text}</span>
+      // Extract 10 words before
+      const wordsBefore = beforeText.trim().split(/\s+/)
+      const before = wordsBefore.slice(Math.max(0, wordsBefore.length - 10)).join(' ')
 
-  const combinedRegex = new RegExp(`(${combinedPatterns.join('|')})`, 'gi')
-  const parts = text.split(combinedRegex)
+      // Extract 10 words after
+      const wordsAfter = afterText.trim().split(/\s+/)
+      const after = wordsAfter.slice(0, 10).join(' ')
+
+      return {
+        before: before ? (wordsBefore.length > 10 ? '… ' : '') + before + ' ' : '',
+        match: match[0],
+        after: after ? ' ' + after + (wordsAfter.length > 10 ? ' …' : '') : '',
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Render a brand snippet with the brand name highlighted.
+ */
+function BrandSnippet({ text, brandTerms }: { text: string; brandTerms: string[] }) {
+  const snippet = extractBrandSnippet(text, brandTerms)
+  if (!snippet) return null
 
   return (
-    <span>
-      {parts.map((part, i) => {
-        const lowerPart = part.toLowerCase()
-        const isBrand = allBrandPatterns.some(p => lowerPart === p.toLowerCase())
-        const isCompetitor = allCompPatterns.some(p => lowerPart === p.toLowerCase())
-        
-        if (isBrand) {
-          return (
-            <mark key={i} className="bg-green-100 text-green-800 px-0.5 rounded font-medium">
-              {part}
-            </mark>
-          )
-        }
-        if (isCompetitor) {
-          return (
-            <mark key={i} className="bg-orange-100 text-orange-800 px-0.5 rounded font-medium">
-              {part}
-            </mark>
-          )
-        }
-        return <span key={i}>{part}</span>
-      })}
-    </span>
+    <div className="flex items-start gap-2">
+      <Quote size={14} className="text-green-400 mt-0.5 flex-shrink-0" />
+      <p className="text-sm text-gray-600 leading-relaxed italic">
+        <span>{snippet.before}</span>
+        <mark className="bg-green-100 text-green-800 px-0.5 rounded font-semibold not-italic">
+          {snippet.match}
+        </mark>
+        <span>{snippet.after}</span>
+      </p>
+    </div>
   )
 }
 
@@ -107,7 +108,7 @@ function EngineResponse({ engineKey, result, brandTerms }: {
 }) {
   const meta = ENGINE_META[engineKey] || { label: engineKey, color: 'text-gray-700', bg: 'bg-gray-50', border: 'border-gray-200', icon: '⚪' }
   const summaryText = result.summary || result.response || ''
-  
+
   return (
     <div className={`rounded-lg border ${meta.border} ${meta.bg} p-3`}>
       <div className="flex items-center justify-between mb-2">
@@ -125,13 +126,17 @@ function EngineResponse({ engineKey, result, brandTerms }: {
           </span>
         )}
       </div>
-      {summaryText ? (
-        <p className="text-sm text-gray-700 leading-relaxed">
-          <HighlightedText text={summaryText} brandTerms={brandTerms} />
-        </p>
+
+      {/* KEY CHANGE: Show snippet for mentioned, nothing for not mentioned */}
+      {result.brand_mentioned && summaryText ? (
+        <BrandSnippet text={summaryText} brandTerms={brandTerms} />
+      ) : result.brand_mentioned ? (
+        <p className="text-xs text-gray-400 italic">Marke erwähnt — Antworttext nicht verfügbar</p>
       ) : (
-        <p className="text-xs text-gray-400 italic">Antworttext nicht verfügbar — nur Ergebnis (erwähnt/nicht erwähnt) vorhanden</p>
+        /* Not mentioned: show nothing or minimal empty state */
+        <p className="text-xs text-gray-400 italic">Keine Erwähnung in der Antwort</p>
       )}
+
       {result.sources && result.sources.length > 0 && (
         <div className="mt-2 pt-2 border-t border-gray-200/50">
           <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">Quellen</p>
@@ -208,7 +213,7 @@ export function LlmAnswers({ reportJson, domain, projectName }: LlmAnswersProps)
           anyMentioned,
           allMentioned,
           mentionCount: Array.from(engineResults.values()).filter(r => r.brand_mentioned).length,
-          totalEngines: activeEngines.length,
+          totalEngines: engineResults.size,
         }
       })
 
@@ -253,7 +258,7 @@ export function LlmAnswers({ reportJson, domain, projectName }: LlmAnswersProps)
             {queries.length} Fragen an {engines.length} KI-Systeme — {mentionedCount} mit Erwähnung, {missingCount} ohne
           </p>
         </div>
-        
+
         {/* Filter pills */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
           <button

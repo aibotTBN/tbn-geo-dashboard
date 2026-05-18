@@ -10,6 +10,7 @@ const ENGINE_META: Record<string, { label: string; color: string; icon: string }
   claude: { label: 'Claude', color: 'text-orange-600', icon: '🟠' },
   gemini: { label: 'Gemini', color: 'text-blue-600', icon: '🔵' },
   perplexity: { label: 'Perplexity', color: 'text-purple-600', icon: '🟣' },
+  google_ai_overview: { label: 'Google AI', color: 'text-red-600', icon: '🔴' },
 }
 
 interface EngineScore {
@@ -119,7 +120,7 @@ export function EngineBreakdown({
   engines: Record<string, EngineScore>
   enginesActive: number
 }) {
-  const engineOrder = ['openai', 'claude', 'gemini', 'perplexity']
+  const engineOrder = ['openai', 'claude', 'gemini', 'perplexity', 'google_ai_overview']
   const activeEngines = engineOrder.filter(
     (e) => engines[e] && engines[e].status === 'ok'
   )
