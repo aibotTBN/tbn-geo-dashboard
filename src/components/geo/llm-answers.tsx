@@ -11,10 +11,10 @@ const ENGINE_META: Record<string, { label: string; color: string; bg: string; bo
   claude: { label: 'Claude', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', icon: '🟠' },
   gemini: { label: 'Gemini', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', icon: '🔵' },
   perplexity: { label: 'Perplexity', color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200', icon: '🟣' },
-  google_ai_overview: { label: 'Google AI', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200', icon: '🔴' },
 }
 
-const ENGINE_ORDER = ['openai', 'claude', 'gemini', 'perplexity', 'google_ai_overview']
+/** Citation engines for the question-by-question view. Google AI has its own card. */
+const ENGINE_ORDER = ['openai', 'claude', 'gemini', 'perplexity']
 
 interface QueryResult {
   query: string
@@ -39,6 +39,14 @@ interface LlmAnswersProps {
 }
 
 /**
+ * Normalize question text: strip leading numbers/dots, trim whitespace.
+ * Ensures "1. What is X?" matches "What is X?" across engines.
+ */
+function normalizeQuery(q: string): string {
+  return (q || '').replace(/^\d+\.\s*/, '').trim()
+}
+
+/**
  * Extract a snippet: 10 words before and after the first brand mention.
  * Returns null if brand not found in text.
  */
@@ -60,11 +68,11 @@ function extractBrandSnippet(text: string, brandTerms: string[]): { before: stri
       const afterText = text.substring(matchEnd)
 
       // Extract 10 words before
-      const wordsBefore = beforeText.trim().split(/\s+/)
+      const wordsBefore = beforeText.trim().split(/\s+/).filter(w => w.length > 0)
       const before = wordsBefore.slice(Math.max(0, wordsBefore.length - 10)).join(' ')
 
       // Extract 10 words after
-      const wordsAfter = afterText.trim().split(/\s+/)
+      const wordsAfter = afterText.trim().split(/\s+/).filter(w => w.length > 0)
       const after = wordsAfter.slice(0, 10).join(' ')
 
       return {
@@ -109,6 +117,9 @@ function EngineResponse({ engineKey, result, brandTerms }: {
   const meta = ENGINE_META[engineKey] || { label: engineKey, color: 'text-gray-700', bg: 'bg-gray-50', border: 'border-gray-200', icon: '⚪' }
   const summaryText = result.summary || result.response || ''
 
+  // Filter sources: only show actual URLs, not brand names
+  const urlSources = (result.sources || []).filter(s => /^https?:\/\//.test(s))
+
   return (
     <div className={`rounded-lg border ${meta.border} ${meta.bg} p-3`}>
       <div className="flex items-center justify-between mb-2">
@@ -127,21 +138,18 @@ function EngineResponse({ engineKey, result, brandTerms }: {
         )}
       </div>
 
-      {/* KEY CHANGE: Show snippet for mentioned, nothing for not mentioned */}
+      {/* Show snippet for mentioned, nothing for not mentioned */}
       {result.brand_mentioned && summaryText ? (
         <BrandSnippet text={summaryText} brandTerms={brandTerms} />
       ) : result.brand_mentioned ? (
         <p className="text-xs text-gray-400 italic">Marke erwähnt — Antworttext nicht verfügbar</p>
-      ) : (
-        /* Not mentioned: show nothing or minimal empty state */
-        <p className="text-xs text-gray-400 italic">Keine Erwähnung in der Antwort</p>
-      )}
+      ) : null}
 
-      {result.sources && result.sources.length > 0 && (
+      {urlSources.length > 0 && (
         <div className="mt-2 pt-2 border-t border-gray-200/50">
           <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">Quellen</p>
           <div className="flex flex-wrap gap-1">
-            {result.sources.slice(0, 5).map((src, i) => (
+            {urlSources.slice(0, 5).map((src: string, i: number) => (
               <a
                 key={i}
                 href={src}
@@ -162,6 +170,8 @@ function EngineResponse({ engineKey, result, brandTerms }: {
 /**
  * Main LLM Answers component.
  * Shows all LLM responses grouped by query.
+ * Only shows the 4 citation engines (OpenAI, Claude, Gemini, Perplexity).
+ * Google AI Overview has its own dedicated card.
  */
 export function LlmAnswers({ reportJson, domain, projectName }: LlmAnswersProps) {
   const [filter, setFilter] = useState<'all' | 'mentioned' | 'missing'>('all')
@@ -182,40 +192,41 @@ export function LlmAnswers({ reportJson, domain, projectName }: LlmAnswersProps)
       if (projectName && projectName !== domain) {
         terms.push(projectName)
         // Also add parts of the company name (e.g. "TBN" from "TBN Public Relations GmbH")
-        const nameParts = projectName.split(/\s+/).filter(p => p.length > 2 && !['gmbh', 'gmbh.', 'ag', 'inc', 'ltd', 'the', 'und', 'and'].includes(p.toLowerCase()))
+        const nameParts = projectName.split(/\s+/).filter((p: string) => p.length > 2 && !['gmbh', 'gmbh.', 'ag', 'inc', 'ltd', 'the', 'und', 'and'].includes(p.toLowerCase()))
         if (nameParts.length > 0) terms.push(nameParts[0])
       }
 
-      // Collect all queries across engines
+      // Collect all queries across engines (only citation engines, not Google AI)
       const queryMap = new Map<string, Map<string, QueryResult>>()
       const activeEngines: string[] = []
 
       for (const engineKey of ENGINE_ORDER) {
         const engineData = citationEngines[engineKey]
-        if (!engineData || engineData.status !== 'ok' || !engineData.results) continue
+        if (!engineData || engineData.status !== 'ok' || !engineData.results || engineData.results.length === 0) continue
         activeEngines.push(engineKey)
 
         for (const result of engineData.results) {
-          const q = result.query?.trim()
+          // Normalize query to prevent duplicates from formatting differences
+          const q = normalizeQuery(result.query)
           if (!q) continue
           if (!queryMap.has(q)) queryMap.set(q, new Map())
-          queryMap.get(q)!.set(engineKey, result)
+          queryMap.get(q)!.set(engineKey, { ...result, query: q })
         }
       }
 
-      // Convert to array
+      // Convert to array, sorted by mention count (most mentions first)
       const queryArray = Array.from(queryMap.entries()).map(([query, engineResults]) => {
-        const anyMentioned = Array.from(engineResults.values()).some(r => r.brand_mentioned)
-        const allMentioned = activeEngines.every(e => engineResults.get(e)?.brand_mentioned)
+        const anyMentioned = Array.from(engineResults.values()).some((r: QueryResult) => r.brand_mentioned)
+        const allMentioned = activeEngines.every((e: string) => engineResults.get(e)?.brand_mentioned)
         return {
           query,
           engineResults,
           anyMentioned,
           allMentioned,
-          mentionCount: Array.from(engineResults.values()).filter(r => r.brand_mentioned).length,
+          mentionCount: Array.from(engineResults.values()).filter((r: QueryResult) => r.brand_mentioned).length,
           totalEngines: engineResults.size,
         }
-      })
+      }).sort((a, b) => b.mentionCount - a.mentionCount)
 
       return { queries: queryArray, engines: activeEngines, brandTerms: terms }
     } catch {
@@ -232,7 +243,7 @@ export function LlmAnswers({ reportJson, domain, projectName }: LlmAnswersProps)
     return true
   })
 
-  const visibleQueries = showAll ? filteredQueries : filteredQueries.slice(0, 5)
+  const visibleQueries = showAll ? filteredQueries : filteredQueries.slice(0, 10)
   const missingCount = queries.filter(q => !q.anyMentioned).length
   const mentionedCount = queries.filter(q => q.anyMentioned).length
 
@@ -286,18 +297,6 @@ export function LlmAnswers({ reportJson, domain, projectName }: LlmAnswersProps)
             <EyeOff size={12} /> Lücken ({missingCount})
           </button>
         </div>
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-gray-400">
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded bg-green-100 border border-green-300" />
-          Eigene Marke erwähnt
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded bg-orange-100 border border-orange-300" />
-          Wettbewerber erwähnt
-        </span>
       </div>
 
       {/* Query list */}
@@ -367,7 +366,7 @@ export function LlmAnswers({ reportJson, domain, projectName }: LlmAnswersProps)
       </div>
 
       {/* Show more/less */}
-      {filteredQueries.length > 5 && (
+      {filteredQueries.length > 10 && (
         <div className="text-center">
           <button
             onClick={() => setShowAll(!showAll)}
