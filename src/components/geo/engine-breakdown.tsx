@@ -22,13 +22,22 @@ interface EngineScore {
   source_citations?: string[]
 }
 
+interface McpDiscoveryDetail {
+  score: number
+  max: number
+  has_llms_txt?: boolean
+  has_mcp_json?: boolean
+  has_agent_card?: boolean
+  configured?: boolean
+}
+
 interface GoogleAiReadiness {
   score: number
   max: number
   details: {
     schema_depth?: { score: number; max: number }
     google_extended?: { score: number; max: number; blocked: boolean }
-    mcp_discovery?: { score: number; max: number }
+    mcp_discovery?: McpDiscoveryDetail
     sitemap_freshness?: { score: number; max: number }
     gemini_visibility?: { score: number; max: number }
   }
@@ -150,6 +159,70 @@ export function EngineBreakdown({
 }
 
 /**
+ * MCP Discovery status display — contextual instead of bare score.
+ */
+function McpDiscoveryRow({ mcp }: { mcp: McpDiscoveryDetail }) {
+  const configured = mcp.configured || mcp.score > 0
+
+  if (!configured) {
+    // Not configured: show neutral status, not a red "0/20"
+    return (
+      <div className="space-y-0.5">
+        <div className="flex justify-between text-xs">
+          <span className="text-gray-500">MCP Discovery</span>
+          <span className="font-medium text-gray-400">Nicht konfiguriert</span>
+        </div>
+        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full rounded-full bg-gray-200" style={{ width: '0%' }} />
+        </div>
+        <p className="text-[10px] text-gray-400 mt-0.5">
+          llms.txt, MCP-Server oder AI-Agent-Card sind noch nicht eingerichtet.
+        </p>
+      </div>
+    )
+  }
+
+  // Configured: show what's active
+  const items: string[] = []
+  if (mcp.has_llms_txt) items.push('llms.txt')
+  if (mcp.has_mcp_json) items.push('MCP-Server')
+  if (mcp.has_agent_card) items.push('Agent-Card')
+
+  const dimPct = Math.round((mcp.score / mcp.max) * 100)
+
+  function getColor(pct: number) {
+    if (pct >= 70) return { bg: 'bg-green-500', text: 'text-green-600' }
+    if (pct >= 50) return { bg: 'bg-yellow-500', text: 'text-yellow-600' }
+    if (pct >= 30) return { bg: 'bg-orange-500', text: 'text-orange-600' }
+    return { bg: 'bg-red-500', text: 'text-red-600' }
+  }
+
+  const color = getColor(dimPct)
+
+  return (
+    <div className="space-y-0.5">
+      <div className="flex justify-between text-xs">
+        <span className="text-gray-500">MCP Discovery</span>
+        <span className={cn('font-medium', color.text)}>
+          {mcp.score}/{mcp.max}
+        </span>
+      </div>
+      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all duration-500', color.bg)}
+          style={{ width: `${dimPct}%` }}
+        />
+      </div>
+      {items.length > 0 && (
+        <p className="text-[10px] text-gray-400 mt-0.5">
+          Erreichbar: {items.join(', ')}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
  * Google AI Readiness sub-score display.
  */
 export function GoogleAiReadinessCard({
@@ -169,13 +242,15 @@ export function GoogleAiReadinessCard({
   const color = getColor(pct)
   const details = data.details || {}
 
-  const dimensions = [
+  // Standard dimensions (without MCP — handled separately)
+  const standardDimensions = [
     { label: 'Schema.org Tiefe', ...(details.schema_depth || {}) },
     { label: 'Google-Extended', ...(details.google_extended || {}) },
-    { label: 'MCP Discovery', ...(details.mcp_discovery || {}) },
     { label: 'Sitemap & Freshness', ...(details.sitemap_freshness || {}) },
     { label: 'Gemini Sichtbarkeit', ...(details.gemini_visibility || {}) },
   ].filter((d) => d.max !== undefined)
+
+  const mcpDetail = details.mcp_discovery
 
   return (
     <div className="space-y-4">
@@ -206,7 +281,7 @@ export function GoogleAiReadinessCard({
 
       {/* Sub-dimensions */}
       <div className="space-y-2 pt-2">
-        {dimensions.map((dim) => {
+        {standardDimensions.map((dim) => {
           const dimPct = dim.max ? Math.round(((dim.score ?? 0) / dim.max) * 100) : 0
           const dimColor = getColor(dimPct)
           return (
@@ -226,6 +301,9 @@ export function GoogleAiReadinessCard({
             </div>
           )
         })}
+
+        {/* MCP Discovery — contextual display */}
+        {mcpDetail && <McpDiscoveryRow mcp={mcpDetail} />}
       </div>
 
       {/* Warning for blocked Google-Extended */}
