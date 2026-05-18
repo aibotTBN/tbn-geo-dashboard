@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import {
   Building2, Briefcase, HelpCircle, Users, FileText, Trophy, BarChart3, Calendar,
   Loader2, Search, CheckCircle, XCircle, Filter, Clock, FileCheck, Plus, X, Sparkles,
-  Save, Eye,
+  Save, Eye, Download,
 } from 'lucide-react'
 
 const ENTITY_META = [
@@ -237,6 +237,32 @@ export default function KnowledgeDomainPage() {
     }
   }
 
+
+  // FAQ HTML Export
+  async function handleExportFaqHtml() {
+    try {
+      const params = new URLSearchParams({ domain, status: statusFilter || 'Approved' })
+      const res = await fetch(`/api/geo/knowledge/export-faq?${params}`)
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.error || 'Export fehlgeschlagen')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `faq-${domain.replace(/[^a-z0-9]/gi, '-')}.html`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('FAQ export failed:', err)
+      alert('Export fehlgeschlagen')
+    }
+  }
+
   // Bulk actions
   async function bulkApproveAll() {
     const drafts = entities.filter((e) => (e.status?.value || e.status || 'Draft') === 'Draft')
@@ -356,6 +382,19 @@ export default function KnowledgeDomainPage() {
                 <Sparkles size={14} className="mr-1.5" />
               )}
               {generatingFaqs ? 'Generiere FAQs...' : 'FAQs generieren (KI)'}
+            </Button>
+          )}
+
+          {/* FAQ HTML Export — only visible on FAQ tab */}
+          {activeType === 'geo_faq' && entities.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportFaqHtml}
+              className="text-emerald-600 hover:text-emerald-700 hover:border-emerald-300"
+            >
+              <Download size={14} className="mr-1.5" />
+              FAQ als HTML exportieren
             </Button>
           )}
 
