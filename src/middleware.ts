@@ -35,6 +35,7 @@ export default withAuth(
           '/api/geo/check', // Free GEO check
           '/api/mcp',       // MCP server
           '/api/waitlist',
+          '/api/debug',     // Temporary: diagnostic endpoint
         ]
 
         if (publicPaths.some(p => pathname.startsWith(p))) {
