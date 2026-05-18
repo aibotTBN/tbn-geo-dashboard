@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { queryTable, TABLE_IDS } from '@/lib/baserow'
 
+interface FaqEntry {
+  question: string
+  answer: string
+  category: string
+}
+
 /**
  * GET /api/geo/knowledge/export-faq?domain=xxx&status=Approved&lang=de
  *
@@ -45,18 +51,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Parse FAQ data
-    const parsedFaqs = faqs.map((f: any) => ({
+    const parsedFaqs: FaqEntry[] = faqs.map((f: any) => ({
       question: (f.question?.value || f.question || '').trim(),
       answer: (f.answer?.value || f.answer || '').trim(),
       category: (f.category?.value || f.category || '').trim(),
-    })).filter((f: any) => f.question && f.answer)
+    })).filter((f: FaqEntry) => f.question && f.answer)
 
     if (format === 'json') {
       return NextResponse.json({ domain, faqs: parsedFaqs, count: parsedFaqs.length })
     }
 
     // Group by category
-    const byCategory: Record<string, typeof parsedFaqs> = {}
+    const byCategory: Record<string, FaqEntry[]> = {}
     for (const faq of parsedFaqs) {
       const cat = faq.category || 'Allgemein'
       if (!byCategory[cat]) byCategory[cat] = []
@@ -67,7 +73,7 @@ export async function GET(request: NextRequest) {
     const jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'FAQPage',
-      'mainEntity': parsedFaqs.map((f) => ({
+      'mainEntity': parsedFaqs.map((f: FaqEntry) => ({
         '@type': 'Question',
         'name': f.question,
         'acceptedAnswer': {
@@ -79,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     // Build HTML
     const categoryBlocks = Object.entries(byCategory).map(([cat, items]) => {
-      const faqItems = items.map((f) => `
+      const faqItems = items.map((f: FaqEntry) => `
       <details class="faq-item">
         <summary class="faq-question">${escapeHtml(f.question)}</summary>
         <div class="faq-answer">
