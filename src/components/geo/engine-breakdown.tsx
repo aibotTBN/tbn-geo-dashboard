@@ -167,14 +167,14 @@ export function GoogleAiReadinessCard({
   }
 
   const color = getColor(pct)
-  const details = data.details
+  const details = data.details || {}
 
   const dimensions = [
-    { label: 'Schema.org Tiefe', ...details.schema_depth },
-    { label: 'Google-Extended', ...details.google_extended },
-    { label: 'MCP Discovery', ...details.mcp_discovery },
-    { label: 'Sitemap & Freshness', ...details.sitemap_freshness },
-    { label: 'Gemini Sichtbarkeit', ...details.gemini_visibility },
+    { label: 'Schema.org Tiefe', ...(details.schema_depth || {}) },
+    { label: 'Google-Extended', ...(details.google_extended || {}) },
+    { label: 'MCP Discovery', ...(details.mcp_discovery || {}) },
+    { label: 'Sitemap & Freshness', ...(details.sitemap_freshness || {}) },
+    { label: 'Gemini Sichtbarkeit', ...(details.gemini_visibility || {}) },
   ].filter((d) => d.max !== undefined)
 
   return (
