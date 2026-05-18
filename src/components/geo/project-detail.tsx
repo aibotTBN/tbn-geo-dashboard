@@ -169,9 +169,11 @@ export default function ProjectDetailPage() {
               citationEngines = report?.citation_engines || {}
               enginesActive = report?.scores?.breakdown?.citation?.engines_active || 1
               googleAiReadiness = report?.google_ai_readiness || null
+              ragReadiness = report?.rag_readiness || null
+              googleAiOverview = report?.google_ai_overview || null
             } catch (e) { /* ignore */ }
           }
-          setDiagnosis({ ...d, citationEngines, enginesActive, googleAiReadiness })
+          setDiagnosis({ ...d, citationEngines, enginesActive, googleAiReadiness, ragReadiness, googleAiOverview })
           setReportJsonRaw(d.reportJson || null)
           setProject(proj)
           setAwaitingDiagnosis(false)
@@ -221,9 +223,11 @@ export default function ProjectDetailPage() {
               citationEngines = report?.citation_engines || {}
               enginesActive = report?.scores?.breakdown?.citation?.engines_active || 1
               googleAiReadiness = report?.google_ai_readiness || null
+              ragReadiness = report?.rag_readiness || null
+              googleAiOverview = report?.google_ai_overview || null
             } catch (e) { /* ignore parse errors */ }
           }
-          setDiagnosis({ ...d, citationEngines, enginesActive, googleAiReadiness })
+          setDiagnosis({ ...d, citationEngines, enginesActive, googleAiReadiness, ragReadiness, googleAiOverview })
           setReportJsonRaw(d.reportJson || null)
         }
 
