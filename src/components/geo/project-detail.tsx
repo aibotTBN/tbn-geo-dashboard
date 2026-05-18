@@ -882,8 +882,8 @@ export default function ProjectDetailPage() {
           </CardContent>
         </Card>
 
-        {/* MCP-Anfragen Analytics — only show when KB has content */}
-        {totalEntities > 0 && <McpAnalytics domain={domain} />}
+        {/* MCP-Anfragen Analytics — only show after KB has been built */}
+        {(project?.pagesCrawled || 0) > 0 && <McpAnalytics domain={domain} />}
 
         {/* Score-Verlauf (Monitoring Phase 2) */}
         {diagnosis && (
