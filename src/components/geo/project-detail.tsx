@@ -883,7 +883,7 @@ export default function ProjectDetailPage() {
         </Card>
 
         {/* MCP-Anfragen Analytics — only show after KB has been built */}
-        {(project?.pagesCrawled || 0) > 0 && <McpAnalytics domain={domain} />}
+        {(project?.pagesCrawled || 0) > 0 && <McpAnalytics domain={domain} pagesCrawled={project?.pagesCrawled || 0} />}
 
         {/* Score-Verlauf (Monitoring Phase 2) */}
         {diagnosis && (
