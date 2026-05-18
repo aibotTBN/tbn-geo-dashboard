@@ -58,7 +58,10 @@ const TOOL_LABELS: Record<string, string> = {
 
 /* ─── Component ─── */
 
-export function McpAnalytics({ domain }: { domain: string }) {
+export function McpAnalytics({ domain, pagesCrawled = 0 }: { domain: string; pagesCrawled?: number }) {
+  // Don't render at all until KB has been built (pagesCrawled > 0)
+  if (pagesCrawled <= 0) return null
+
   const [stats, setStats] = useState<McpStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
