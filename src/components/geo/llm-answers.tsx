@@ -140,7 +140,18 @@ function EngineResponse({ engineKey, result, brandTerms }: {
 
       {/* Show snippet for mentioned, nothing for not mentioned */}
       {result.brand_mentioned && summaryText ? (
-        <BrandSnippet text={summaryText} brandTerms={brandTerms} />
+        <>
+          <BrandSnippet text={summaryText} brandTerms={brandTerms} />
+          {/* Fallback if BrandSnippet can't find brand term in text */}
+          {!extractBrandSnippet(summaryText, brandTerms) && (
+            <div className="flex items-start gap-2">
+              <Quote size={14} className="text-green-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-gray-600 leading-relaxed italic">
+                {summaryText.split(/\s+/).slice(0, 20).join(' ')}{summaryText.split(/\s+/).length > 20 ? ' …' : ''}
+              </p>
+            </div>
+          )}
+        </>
       ) : result.brand_mentioned ? (
         <p className="text-xs text-gray-400 italic">Marke erwähnt — Antworttext nicht verfügbar</p>
       ) : null}
