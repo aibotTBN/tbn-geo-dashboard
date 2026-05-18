@@ -722,7 +722,7 @@ export default function ProjectDetailPage() {
             <div className="flex-1">
               <p className="font-medium text-blue-900">GEO Diagnose läuft…</p>
               <p className="text-sm text-blue-700">
-                Die erste Diagnose wurde automatisch gestartet. 10 Fragen werden an 4 KI-Engines gesendet — das dauert ca. 2–3 Minuten. Die Ergebnisse erscheinen automatisch.
+                Die erste Diagnose wurde automatisch gestartet. 20 Fragen werden an 5 KI-Engines gesendet — das dauert ca. 2–3 Minuten. Die Ergebnisse erscheinen automatisch.
               </p>
             </div>
           </div>
