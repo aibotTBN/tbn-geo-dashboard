@@ -4,7 +4,7 @@ import { useState, Suspense } from 'react'
 import { signIn } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Radar, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Radar, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -23,6 +23,7 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
   const errorParam = searchParams.get('error')
+  const verifiedParam = searchParams.get('verified')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -36,6 +37,9 @@ function LoginForm() {
     OAuthSignin: 'Google-Anmeldung fehlgeschlagen',
     Callback: 'Authentifizierungsfehler',
     Default: 'Ein Fehler ist aufgetreten',
+    'invalid-verification': 'Ungültiger Bestätigungslink',
+    'verification-expired': 'Der Bestätigungslink ist abgelaufen. Bitte registrieren Sie sich erneut.',
+    'verification-failed': 'E-Mail-Bestätigung fehlgeschlagen. Bitte versuchen Sie es erneut.',
   }
 
   const [error, setError] = useState(
@@ -78,6 +82,14 @@ function LoginForm() {
 
         {/* Login Form */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 space-y-6">
+          {/* Verification success message */}
+          {verifiedParam === 'true' && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+              <CheckCircle2 size={16} />
+              E-Mail erfolgreich bestätigt! Sie können sich jetzt anmelden.
+            </div>
+          )}
+
           {/* Error message */}
           {error && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
