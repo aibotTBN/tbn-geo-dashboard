@@ -223,14 +223,23 @@ async function main() {
 
     console.log('  ✓ All tables OK')
 
-    // ── 6. Upgrade @tbnpr.de users to TBN_STAFF ─────────────
-    console.log('[Pre-migrate] Step 6: TBN staff roles...')
+    // ── 6. Upgrade @tbnpr.de users to TBN_STAFF + specific admins ──
+    console.log('[Pre-migrate] Step 6: TBN staff & admin roles...')
     try {
+      // All @tbnpr.de users → at least TBN_STAFF
       const upgraded = await exec(`
         UPDATE "User" SET role = 'TBN_STAFF' 
         WHERE email LIKE '%@tbnpr.de' AND role = 'USER'
       `)
-      if (upgraded > 0) console.log(`  Upgraded ${upgraded} @tbnpr.de users`)
+      if (upgraded > 0) console.log(`  Upgraded ${upgraded} @tbnpr.de users to TBN_STAFF`)
+
+      // Specific admins
+      const admins = await exec(`
+        UPDATE "User" SET role = 'ADMIN'
+        WHERE email IN ('fuderholz@tbnpr.de', 'kantarci@tbnpr.de')
+          AND role != 'ADMIN'
+      `)
+      if (admins > 0) console.log(`  Promoted ${admins} users to ADMIN`)
     } catch (e) {
       console.log(`  (Could not upgrade: ${e.message})`)
     }
