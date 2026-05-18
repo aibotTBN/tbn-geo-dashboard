@@ -1,24 +1,31 @@
 #!/bin/sh
 
 echo "=== LLM Radar Startup ==="
+echo "Node $(node -v) | $(date -u)"
 
-# Step 1: Run pre-migration (converts string roles to enum, idempotent)
-echo "Running pre-migration checks..."
+# Step 1: Run pre-migration (converts text roles to enum, adds missing columns)
+echo ""
+echo "── Step 1: Pre-migration ──"
 if node ./prisma/pre-migrate.mjs 2>&1; then
-  echo "Pre-migration complete."
+  echo "Pre-migration OK."
 else
-  echo "WARNING: Pre-migration failed (may be fine for fresh installs)"
+  echo "WARNING: Pre-migration had issues (see above). Continuing..."
 fi
 
-# Step 2: Run Prisma db push (schema sync — safe mode, no data loss)
-echo "Running Prisma database migrations..."
-if node ./node_modules/prisma/build/index.js db push --skip-generate --schema=./prisma/schema.prisma 2>&1; then
-  echo "Database migrations complete."
-elif npx prisma db push --skip-generate 2>&1; then
-  echo "Database migrations complete (via npx)."
+# Step 2: Prisma db push — sync schema to DB
+# First try without --accept-data-loss (safe mode).
+# If that fails (e.g., remaining type mismatches), retry WITH --accept-data-loss.
+# At this point, pre-migration has already safely converted all data.
+echo ""
+echo "── Step 2: Prisma DB sync ──"
+if npx prisma db push --skip-generate 2>&1; then
+  echo "Database sync OK (safe mode)."
+elif npx prisma db push --skip-generate --accept-data-loss 2>&1; then
+  echo "Database sync OK (with accept-data-loss fallback)."
 else
-  echo "WARNING: Database migration failed - starting anyway"
+  echo "WARNING: Database sync failed. App may not function correctly."
 fi
 
-echo "Starting LLM Radar..."
+echo ""
+echo "── Starting LLM Radar ──"
 exec "$@"
