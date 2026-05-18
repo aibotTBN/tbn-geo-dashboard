@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+function redirectUrl(path: string): string {
+  const base = process.env.NEXTAUTH_URL || 'https://llmradar.de'
+  return `${base}${path}`
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const token = searchParams.get('token')
   const email = searchParams.get('email')
 
   if (!token || !email) {
-    return NextResponse.redirect(new URL('/login?error=invalid-verification', request.url))
+    return NextResponse.redirect(redirectUrl('/login?error=invalid-verification'))
   }
 
   try {
@@ -16,7 +21,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!verification) {
-      return NextResponse.redirect(new URL('/login?error=invalid-verification', request.url))
+      return NextResponse.redirect(redirectUrl('/login?error=invalid-verification'))
     }
 
     if (verification.expires < new Date()) {
@@ -24,7 +29,7 @@ export async function GET(request: NextRequest) {
       await prisma.verificationToken.delete({
         where: { identifier_token: { identifier: email, token } },
       })
-      return NextResponse.redirect(new URL('/login?error=verification-expired', request.url))
+      return NextResponse.redirect(redirectUrl('/login?error=verification-expired'))
     }
 
     // Verify the user
@@ -41,9 +46,9 @@ export async function GET(request: NextRequest) {
     console.log(`[Auth] Email verified: ${email}`)
 
     // Redirect to login with success
-    return NextResponse.redirect(new URL('/login?verified=true', request.url))
+    return NextResponse.redirect(redirectUrl('/login?verified=true'))
   } catch (error) {
     console.error('[Auth] Verification error:', error)
-    return NextResponse.redirect(new URL('/login?error=verification-failed', request.url))
+    return NextResponse.redirect(redirectUrl('/login?error=verification-failed'))
   }
 }
