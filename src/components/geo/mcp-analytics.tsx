@@ -157,14 +157,20 @@ export function McpAnalytics({ domain }: { domain: string }) {
       </div>
 
       {!hasData ? (
-        /* ─── Empty state ─── */
-        <div className="px-6 py-12 text-center">
-          <Bot size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-900 mb-1">Noch keine MCP-Anfragen</p>
-          <p className="text-xs text-gray-500 max-w-md mx-auto">
+        /* ─── Empty state — MCP server ready but no queries yet ─── */
+        <div className="px-6 py-8">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
+              <Globe2 size={16} className="text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900">MCP-Server bereit</p>
+              <p className="text-xs text-green-600">Knowledge Base aktiv — warte auf erste KI-Anfragen</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 max-w-md">
             Sobald externe KI-Systeme (ChatGPT, Claude, Gemini etc.) Ihre Knowledge Base über den MCP-Server abfragen,
-            erscheinen hier die Statistiken. Stellen Sie sicher, dass Ihre <code className="bg-gray-100 px-1 rounded">mcp.json</code> Discovery-Datei
-            korrekt eingerichtet ist.
+            erscheinen hier Statistiken zu Anfragen, genutzten Tools und anfragenden Engines.
           </p>
         </div>
       ) : (
