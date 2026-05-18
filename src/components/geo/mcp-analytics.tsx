@@ -7,7 +7,7 @@ import {
 import {
   Activity, TrendingUp, TrendingDown, Minus, Bot, Wrench,
   RefreshCw, Clock, Globe2, ChevronDown, ChevronUp, Zap,
-  AlertCircle, Loader2,
+  AlertCircle, Loader2, XCircle,
 } from 'lucide-react'
 
 /* ─── Types ─── */
@@ -28,6 +28,12 @@ interface McpStats {
     sourceIp: string
     createdAt: string
   }[]
+}
+
+interface McpDiscovery {
+  available: boolean
+  url: string
+  data?: Record<string, unknown>
 }
 
 /* ─── Engine colors ─── */
@@ -59,10 +65,8 @@ const TOOL_LABELS: Record<string, string> = {
 /* ─── Component ─── */
 
 export function McpAnalytics({ domain, pagesCrawled = 0 }: { domain: string; pagesCrawled?: number }) {
-  // Don't render at all until KB has been built (pagesCrawled > 0)
-  if (pagesCrawled <= 0) return null
-
   const [stats, setStats] = useState<McpStats | null>(null)
+  const [mcpDiscovery, setMcpDiscovery] = useState<McpDiscovery | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [days, setDays] = useState(30)
@@ -72,10 +76,17 @@ export function McpAnalytics({ domain, pagesCrawled = 0 }: { domain: string; pag
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/geo/mcp-stats?domain=${encodeURIComponent(domain)}&days=${days}`)
-      if (!res.ok) throw new Error(`Fehler ${res.status}`)
-      const data = await res.json()
-      setStats(data)
+      const [statsRes, mcpRes] = await Promise.all([
+        fetch(`/api/geo/mcp-stats?domain=${encodeURIComponent(domain)}&days=${days}`),
+        fetch(`/api/geo/check-mcp?domain=${encodeURIComponent(domain)}`),
+      ])
+      if (!statsRes.ok) throw new Error(`Fehler ${statsRes.status}`)
+      const statsData = await statsRes.json()
+      setStats(statsData)
+      if (mcpRes.ok) {
+        const mcpData = await mcpRes.json()
+        setMcpDiscovery(mcpData)
+      }
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -85,7 +96,10 @@ export function McpAnalytics({ domain, pagesCrawled = 0 }: { domain: string; pag
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
-  /* ─── Loading / Error / Empty states ─── */
+  // Don't render at all until KB has been built (pagesCrawled > 0)
+  if (pagesCrawled <= 0) return null
+
+  /* ─── Loading / Error states ─── */
 
   if (loading) {
     return (
@@ -116,6 +130,7 @@ export function McpAnalytics({ domain, pagesCrawled = 0 }: { domain: string; pag
   if (!stats) return null
 
   const hasData = stats.totalRequests > 0
+  const mcpAvailable = mcpDiscovery?.available ?? false
 
   /* ─── Trend indicator ─── */
   const TrendIcon = stats.trendPercent > 0 ? TrendingUp : stats.trendPercent < 0 ? TrendingDown : Minus
@@ -160,24 +175,54 @@ export function McpAnalytics({ domain, pagesCrawled = 0 }: { domain: string; pag
       </div>
 
       {!hasData ? (
-        /* ─── Empty state — MCP server ready but no queries yet ─── */
+        /* ─── Empty state — show MCP server status ─── */
         <div className="px-6 py-8">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
-              <Globe2 size={16} className="text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900">MCP-Server bereit</p>
-              <p className="text-xs text-green-600">Knowledge Base aktiv — warte auf erste KI-Anfragen</p>
-            </div>
+            {mcpAvailable ? (
+              <>
+                <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
+                  <Globe2 size={16} className="text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">MCP-Server erreichbar</p>
+                  <p className="text-xs text-green-600">Knowledge Base aktiv — warte auf erste KI-Anfragen</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                  <XCircle size={16} className="text-gray-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Kein MCP-Server gefunden</p>
+                  <p className="text-xs text-gray-400">
+                    Unter <span className="font-mono text-[11px]">{domain}/.well-known/mcp.json</span> wurde kein MCP-Endpunkt erkannt
+                  </p>
+                </div>
+              </>
+            )}
           </div>
           <p className="text-xs text-gray-500 max-w-md">
-            Sobald externe KI-Systeme (ChatGPT, Claude, Gemini etc.) Ihre Knowledge Base über den MCP-Server abfragen,
-            erscheinen hier Statistiken zu Anfragen, genutzten Tools und anfragenden Engines.
+            {mcpAvailable
+              ? 'Sobald externe KI-Systeme (ChatGPT, Claude, Gemini etc.) Ihre Knowledge Base über den MCP-Server abfragen, erscheinen hier Statistiken zu Anfragen, genutzten Tools und anfragenden Engines.'
+              : 'Damit KI-Systeme Ihre Knowledge Base finden können, muss eine mcp.json unter /.well-known/ auf Ihrer Domain erreichbar sein. Sobald der MCP-Server eingerichtet ist, werden hier Zugriffe angezeigt.'}
           </p>
         </div>
       ) : (
         <div className="p-6 space-y-6">
+          {/* ─── MCP Status Badge ─── */}
+          <div className="flex items-center gap-2">
+            {mcpAvailable ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
+                <Globe2 size={12} /> MCP-Server erreichbar
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                <XCircle size={12} /> Kein MCP-Server gefunden
+              </span>
+            )}
+          </div>
+
           {/* ─── KPI Cards ─── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {/* Total requests */}
