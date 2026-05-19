@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     if (faqs.length === 0) {
       return NextResponse.json({
         error: `Keine FAQs mit Status "${status}" gefunden. Bitte FAQs erst freigeben (Approved).`,
-        total: result.rows?.length || 0,
+        total: allRows.length,
       }, { status: 404 })
     }
 
