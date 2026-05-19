@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
     const n8nResp = await fetch(`${N8N_WEBHOOK_URL}/geo-generate-faqs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(120000), // 2 min timeout
       body: JSON.stringify({
         domain,
         company_name: companyName,
@@ -113,7 +114,28 @@ export async function POST(request: NextRequest) {
       throw new Error(`FAQ-Generator fehlgeschlagen: ${n8nResp.status} ${text}`)
     }
 
-    const result = await n8nResp.json()
+    // Parse n8n response safely — handle empty/non-JSON responses
+    const responseText = await n8nResp.text()
+    if (!responseText || responseText.trim().length === 0) {
+      throw new Error('Der FAQ-Generator hat keine Antwort geliefert. Bitte erneut versuchen.')
+    }
+
+    let result: any
+    try {
+      result = JSON.parse(responseText)
+      // n8n respondToWebhook with allIncomingItems wraps in array
+      if (Array.isArray(result)) {
+        result = result[0] || {}
+      }
+    } catch (parseErr) {
+      console.error('Failed to parse n8n response:', responseText.substring(0, 500))
+      throw new Error('Die Antwort vom FAQ-Generator konnte nicht verarbeitet werden. Bitte erneut versuchen.')
+    }
+
+    if (result.error) {
+      throw new Error(`FAQ-Generator Fehler: ${result.error}`)
+    }
+
     const faqs = result.faqs || []
 
     // 3. Optionally save to KB
