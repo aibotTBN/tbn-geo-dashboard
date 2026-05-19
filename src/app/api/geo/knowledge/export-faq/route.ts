@@ -32,8 +32,18 @@ export async function GET(request: NextRequest) {
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 })
 
   try {
-    const result = await queryTable(TABLE_IDS.geo_faq, { domain, size: 500 })
-    let faqs = result.rows || []
+    // Baserow max page size is 200 — paginate to get all FAQs
+    let allRows: any[] = []
+    let page = 1
+    let hasMore = true
+    while (hasMore) {
+      const result = await queryTable(TABLE_IDS.geo_faq, { domain, size: 200, page })
+      allRows = allRows.concat(result.rows || [])
+      hasMore = allRows.length < result.count
+      page++
+      if (page > 20) break // safety limit
+    }
+    let faqs = allRows
 
     // Filter by status
     if (status !== 'all') {
