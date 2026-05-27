@@ -25,6 +25,7 @@ function LoginForm() {
   const errorParam = searchParams.get('error')
   const verifiedParam = searchParams.get('verified')
   const checkoutSuccess = searchParams.get('checkout') === 'success'
+  const checkoutCancelled = searchParams.get('checkout') === 'cancelled'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -88,6 +89,14 @@ function LoginForm() {
             <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
               <CheckCircle2 size={16} />
               Zahlung erfolgreich! Melden Sie sich jetzt an, um Ihr Dashboard zu öffnen.
+            </div>
+          )}
+
+          {/* Checkout cancelled message */}
+          {checkoutCancelled && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+              <AlertCircle size={16} className="flex-shrink-0" />
+              <span>Zahlung abgebrochen. Melden Sie sich an und wählen Sie einen Plan im Dashboard.</span>
             </div>
           )}
 

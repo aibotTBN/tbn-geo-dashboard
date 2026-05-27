@@ -189,7 +189,17 @@ function RegisterForm() {
         {error && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm mb-6 max-w-md mx-auto">
             <AlertCircle size={16} className="flex-shrink-0" />
-            {error}
+            <span>
+              {error}
+              {error.includes('existiert bereits') && (
+                <>
+                  {' '}
+                  <Link href="/login" className="font-medium underline hover:text-red-800">
+                    Jetzt anmelden →
+                  </Link>
+                </>
+              )}
+            </span>
           </div>
         )}
 
