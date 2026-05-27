@@ -118,8 +118,8 @@ export async function POST(request: NextRequest) {
       billing_address_collection: 'required',
       // Automatic tax calculation (19% MwSt. for DE, EU reverse charge, etc.)
       automatic_tax: { enabled: true },
-      // Save billing address from checkout to customer (required for automatic_tax)
-      customer_update: { address: 'auto' },
+      // Save billing address + name from checkout to customer (required for automatic_tax + tax_id_collection)
+      customer_update: { address: 'auto', name: 'auto' },
       // Allow B2B customers to enter their USt-IdNr for reverse charge
       tax_id_collection: { enabled: true },
     })
