@@ -8,14 +8,13 @@ import { stripe, getPriceId, isStripeConfigured } from '@/lib/stripe'
  * POST /api/stripe/checkout-session
  * 
  * Creates a Stripe Checkout Session for plan subscription.
- * Requires authentication. Accepts: { plan: "STARTER" | "PRO" }
- * 
- * Also used for unauthenticated checkout after registration:
- * Accepts: { plan, userId } — userId is set by the register flow
+ * Requires authentication OR a userId from the registration flow.
+ * Accepts: { plan: "STARTER" | "PRO", userId?: string }
  */
 export async function POST(request: NextRequest) {
   try {
     if (!isStripeConfigured()) {
+      console.error('[Stripe] Not configured: missing STRIPE_SECRET_KEY or NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY')
       return NextResponse.json(
         { error: 'Zahlungssystem ist noch nicht konfiguriert' },
         { status: 503 }
@@ -59,11 +58,14 @@ export async function POST(request: NextRequest) {
 
     const priceId = getPriceId(plan)
     if (!priceId) {
+      console.error(`[Stripe] No price ID for plan "${plan}". Check env vars STRIPE_PRICE_STARTER / STRIPE_PRICE_PRO`)
       return NextResponse.json(
-        { error: `Preis für Plan ${plan} nicht konfiguriert` },
+        { error: `Preis für Plan ${plan} nicht konfiguriert. Bitte STRIPE_PRICE_${plan} prüfen.` },
         { status: 500 }
       )
     }
+
+    console.log(`[Stripe] Creating checkout for user=${userId}, plan=${plan}, priceId=${priceId}`)
 
     // Look up or create Stripe customer
     const user = await prisma.user.findUnique({ where: { id: userId } })
@@ -81,15 +83,17 @@ export async function POST(request: NextRequest) {
         where: { id: userId },
         data: { stripeCustomerId },
       })
+      console.log(`[Stripe] Created customer ${stripeCustomerId} for ${userEmail}`)
     }
 
     const baseUrl = process.env.NEXTAUTH_URL || 'https://llmradar.de'
 
     // Create Checkout Session
+    // Don't specify payment_method_types — let Stripe auto-detect
+    // based on what's enabled in the Dashboard (card is always available)
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: 'subscription',
-      payment_method_types: ['card', 'sepa_debit'],
       line_items: [
         {
           price: priceId,
@@ -108,24 +112,31 @@ export async function POST(request: NextRequest) {
           plan,
         },
       },
-      // German locale for B2B DACH customers
       locale: 'de',
-      // Allow promotion codes
       allow_promotion_codes: true,
-      // Tax ID collection for B2B
-      tax_id_collection: { enabled: true },
-      // Billing address for invoices
       billing_address_collection: 'required',
     })
+
+    console.log(`[Stripe] Checkout session created: ${checkoutSession.id}`)
 
     return NextResponse.json({
       sessionId: checkoutSession.id,
       url: checkoutSession.url,
     })
   } catch (error: any) {
-    console.error('[Stripe] Checkout session error:', error)
+    // Log the full Stripe error for debugging
+    console.error('[Stripe] Checkout session error:', {
+      message: error?.message,
+      type: error?.type,
+      code: error?.code,
+      statusCode: error?.statusCode,
+      raw: error?.raw?.message,
+    })
+    
+    // Return a more helpful error message
+    const errorMessage = error?.raw?.message || error?.message || 'Unbekannter Fehler'
     return NextResponse.json(
-      { error: 'Fehler beim Erstellen der Checkout-Session' },
+      { error: `Fehler beim Erstellen der Checkout-Session: ${errorMessage}` },
       { status: 500 }
     )
   }
