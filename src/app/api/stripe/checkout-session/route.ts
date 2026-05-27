@@ -89,8 +89,9 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXTAUTH_URL || 'https://llmradar.de'
 
     // Create Checkout Session
-    // Don't specify payment_method_types — let Stripe auto-detect
-    // based on what's enabled in the Dashboard (card is always available)
+    // - automatic_tax: Stripe Tax calculates VAT based on customer location
+    //   (requires Stripe Tax activation in Dashboard + tax_behavior on prices)
+    // - No explicit payment_method_types: auto-detect from Dashboard config
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: 'subscription',
@@ -115,6 +116,10 @@ export async function POST(request: NextRequest) {
       locale: 'de',
       allow_promotion_codes: true,
       billing_address_collection: 'required',
+      // Automatic tax calculation (19% MwSt. for DE, EU reverse charge, etc.)
+      automatic_tax: { enabled: true },
+      // Allow B2B customers to enter their USt-IdNr for reverse charge
+      tax_id_collection: { enabled: true },
     })
 
     console.log(`[Stripe] Checkout session created: ${checkoutSession.id}`)
