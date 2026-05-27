@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Radar, ArrowRight, CheckCircle2, Search, Shield, FileText, Clock, BarChart3, Brain, Sparkles, Zap, Eye, ChevronRight, Globe2, Bot, Database, Users, TrendingUp, Lock, Mail, X, ChevronDown, Building2, Headphones } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────
-   LLM Radar — Landing Page (v2 — Pricing + Closed Beta)
+   LLM Radar — Landing Page (v3 — Live with Stripe)
    ────────────────────────────────────────────────────── */
 
 function AnimatedCounter({ end, suffix = '', duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
@@ -224,12 +224,15 @@ export default function LandingPage() {
               <a href="#faq" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">FAQ</a>
             </div>
             <div className="flex items-center gap-4">
-              <a href="/beta" className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+              <a href="/beta" className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
                 Kostenlose Analyse
-                <ArrowRight className="w-4 h-4" />
               </a>
               <a href="/login" className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">
                 Anmelden
+              </a>
+              <a href="/register" className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors">
+                Jetzt starten
+                <ArrowRight className="w-4 h-4" />
               </a>
             </div>
           </div>
@@ -248,7 +251,7 @@ export default function LandingPage() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-4 py-1.5 mb-6">
               <Sparkles className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-700">Closed Beta — Jetzt kostenlos testen</span>
+              <span className="text-sm font-medium text-blue-700">GEO — Generative Engine Optimization</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 tracking-tight leading-[1.1]">
@@ -263,9 +266,22 @@ export default function LandingPage() {
               LLM Radar zeigt Ihnen, <strong>was diese KI-Systeme über Sie wissen</strong> — und wie Sie es verbessern.
             </p>
 
-            <div className="mt-10" id="hero-form">
-              <WaitlistForm variant="hero" />
+            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4" id="hero-cta">
+              <a
+                href="/register"
+                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base shadow-lg shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 transition-all"
+              >
+                Jetzt starten
+                <ArrowRight className="w-5 h-5" />
+              </a>
+              <a
+                href="/beta"
+                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-base hover:border-blue-300 hover:text-blue-600 transition-all"
+              >
+                Kostenlose GEO-Analyse
+              </a>
             </div>
+            <p className="text-sm text-gray-500 mt-4">Starter ab €99/Monat · GEO-Analyse dauerhaft kostenlos</p>
           </div>
 
           {/* Dashboard Preview */}
@@ -730,15 +746,12 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <div className="relative">
-                <button
-                  disabled
-                  className="block w-full text-center py-3 px-6 rounded-xl bg-blue-600/50 text-white font-semibold cursor-not-allowed"
-                >
-                  Demnächst verfügbar
-                </button>
-                <p className="text-xs text-center text-gray-500 mt-2">Closed Beta — Platz sichern ↑</p>
-              </div>
+              <a
+                href="/register?plan=starter"
+                className="block w-full text-center py-3 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all"
+              >
+                Starter wählen
+              </a>
             </div>
 
             {/* PRO */}
@@ -775,15 +788,12 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <div className="relative">
-                <button
-                  disabled
-                  className="block w-full text-center py-3 px-6 rounded-xl bg-gray-100 text-gray-500 font-semibold cursor-not-allowed"
-                >
-                  Demnächst verfügbar
-                </button>
-                <p className="text-xs text-center text-gray-500 mt-2">Closed Beta — Platz sichern ↑</p>
-              </div>
+              <a
+                href="/register?plan=pro"
+                className="block w-full text-center py-3 px-6 rounded-xl border-2 border-purple-200 text-purple-700 font-semibold hover:border-purple-400 hover:bg-purple-50 transition-all"
+              >
+                Pro wählen
+              </a>
             </div>
 
             {/* MANAGED */}
@@ -869,8 +879,8 @@ export default function LandingPage() {
               answer="Im Managed-Tarif übernimmt das TBN-Team die vollständige Pflege Ihrer Knowledge Base, erstellt monatliche GEO-Reports mit Handlungsempfehlungen, führt quartalsweise Strategie-Calls durch und gibt konkrete Content-Empfehlungen. Ideal für Unternehmen, die das Thema KI-Sichtbarkeit professionell angehen möchten, ohne interne Ressourcen aufzubauen."
             />
             <FAQItem
-              question="Wie funktioniert die Closed Beta?"
-              answer="Melden Sie sich mit Ihrer E-Mail an und erhalten Sie sofort Zugang zur kostenlosen GEO-Analyse. Die Paid-Tarife (Starter, Pro, Managed) werden nach der Beta-Phase freigeschaltet. Beta-Tester erhalten exklusive Konditionen beim Launch."
+              question="Kann ich LLM Radar kostenlos testen?"
+              answer="Ja! Die GEO-Analyse ist dauerhaft kostenlos — Sie erhalten einen vollständigen GEO Score mit Subscores und Handlungsempfehlungen. Für erweiterte Funktionen wie den Knowledge Builder, Monitoring und Exports wählen Sie den Starter- oder Pro-Plan."
             />
           </div>
         </div>
@@ -884,18 +894,30 @@ export default function LandingPage() {
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-6">
             <Sparkles className="w-4 h-4 text-blue-300" />
-            <span className="text-sm font-medium text-blue-200">Limitierte Plätze in der Closed Beta</span>
+            <span className="text-sm font-medium text-blue-200">Jetzt live — sofort loslegen</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-bold text-white leading-tight">
-            Sichern Sie sich Ihren Platz,{' '}
+            Starten Sie jetzt,{' '}
             <span className="text-blue-400">bevor es Ihre Konkurrenz tut</span>
           </h2>
           <p className="mt-6 text-lg text-slate-300 max-w-xl mx-auto">
-            Die ersten Beta-Tester erhalten exklusiven Zugang zum vollständigen Tool — 
-            inklusive Knowledge Builder und persönlichem Onboarding.
+            Kostenlose GEO-Analyse in 2 Minuten. Oder starten Sie direkt mit Starter oder Pro
+            für Knowledge Builder, Monitoring und Exports.
           </p>
-          <div className="mt-10">
-            <WaitlistForm variant="bottom" />
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="/register"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-semibold text-base shadow-lg shadow-blue-500/30 transition-all"
+            >
+              Konto erstellen
+              <ArrowRight className="w-5 h-5" />
+            </a>
+            <a
+              href="/beta"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl border-2 border-white/20 text-white font-semibold text-base hover:border-blue-400 transition-all"
+            >
+              Kostenlose Analyse
+            </a>
           </div>
         </div>
       </section>
