@@ -7,9 +7,16 @@ import bcrypt from 'bcryptjs'
 
 /**
  * Custom adapter wrapper around PrismaAdapter.
- * Overrides linkAccount to use Prisma directly, avoiding potential
- * compatibility issues between @auth/prisma-adapter v2 (Auth.js v5)
- * and NextAuth v4's account-linking flow.
+ *
+ * Fixes two issues with @auth/prisma-adapter v2 on NextAuth v4:
+ *
+ * 1. linkAccount: The v2 adapter (Auth.js v5) may pass extra OAuth fields
+ *    to Prisma that aren't in the Account schema → Prisma rejects them.
+ *    We map only known fields explicitly.
+ *
+ * 2. getUserByAccount: The v2 adapter returns a full Prisma User which may
+ *    include fields that NextAuth v4 doesn't expect. We normalize the
+ *    return to ensure compatibility.
  */
 function createAdapter() {
   const base = PrismaAdapter(prisma) as any
@@ -17,8 +24,48 @@ function createAdapter() {
   return {
     ...base,
 
-    // Explicit linkAccount using Prisma to avoid v4/v5 adapter mismatch
+    async getUserByAccount(providerAccount: {
+      provider: string
+      providerAccountId: string
+    }) {
+      console.log(
+        '[Auth Adapter] getUserByAccount:',
+        providerAccount.provider,
+        providerAccount.providerAccountId
+      )
+
+      const account = await prisma.account.findUnique({
+        where: {
+          provider_providerAccountId: {
+            provider: providerAccount.provider,
+            providerAccountId: providerAccount.providerAccountId,
+          },
+        },
+        include: { user: true },
+      })
+
+      if (!account?.user) {
+        console.log('[Auth Adapter] getUserByAccount: no linked user found')
+        return null
+      }
+
+      console.log(
+        '[Auth Adapter] getUserByAccount: found user',
+        account.user.id,
+        account.user.email
+      )
+
+      return account.user
+    },
+
     async linkAccount(rawAccount: any) {
+      console.log(
+        '[Auth Adapter] linkAccount:',
+        rawAccount.provider,
+        'userId=',
+        rawAccount.userId
+      )
+
       try {
         const created = await prisma.account.create({
           data: {
@@ -28,27 +75,23 @@ function createAdapter() {
             providerAccountId: rawAccount.providerAccountId,
             refresh_token: rawAccount.refresh_token ?? null,
             access_token: rawAccount.access_token ?? null,
-            expires_at: rawAccount.expires_at
-              ? typeof rawAccount.expires_at === 'number'
-                ? rawAccount.expires_at
-                : parseInt(rawAccount.expires_at, 10)
-              : null,
+            expires_at:
+              rawAccount.expires_at != null
+                ? typeof rawAccount.expires_at === 'number'
+                  ? rawAccount.expires_at
+                  : parseInt(rawAccount.expires_at, 10)
+                : null,
             token_type: rawAccount.token_type ?? null,
             scope: rawAccount.scope ?? null,
             id_token: rawAccount.id_token ?? null,
             session_state: rawAccount.session_state?.toString() ?? null,
           },
         })
-        console.log(
-          `[Auth] Linked ${rawAccount.provider} account for user ${rawAccount.userId}`
-        )
+        console.log('[Auth Adapter] linkAccount: success')
         return created
       } catch (error: any) {
-        // P2002 = unique constraint violation → account already linked, just return it
         if (error?.code === 'P2002') {
-          console.log(
-            `[Auth] Account already linked (${rawAccount.provider}/${rawAccount.providerAccountId})`
-          )
+          console.log('[Auth Adapter] linkAccount: already exists (P2002), returning existing')
           return prisma.account.findUnique({
             where: {
               provider_providerAccountId: {
@@ -58,7 +101,39 @@ function createAdapter() {
             },
           })
         }
-        console.error('[Auth] linkAccount error:', error)
+        console.error('[Auth Adapter] linkAccount error:', error)
+        throw error
+      }
+    },
+
+    async updateAccount(data: any) {
+      console.log('[Auth Adapter] updateAccount:', data.provider, data.providerAccountId)
+      // Only update fields that exist in our schema
+      try {
+        return await prisma.account.update({
+          where: {
+            provider_providerAccountId: {
+              provider: data.provider,
+              providerAccountId: data.providerAccountId,
+            },
+          },
+          data: {
+            refresh_token: data.refresh_token ?? undefined,
+            access_token: data.access_token ?? undefined,
+            expires_at:
+              data.expires_at != null
+                ? typeof data.expires_at === 'number'
+                  ? data.expires_at
+                  : parseInt(data.expires_at, 10)
+                : undefined,
+            token_type: data.token_type ?? undefined,
+            scope: data.scope ?? undefined,
+            id_token: data.id_token ?? undefined,
+            session_state: data.session_state?.toString() ?? undefined,
+          },
+        })
+      } catch (error: any) {
+        console.error('[Auth Adapter] updateAccount error:', error)
         throw error
       }
     },
@@ -68,7 +143,7 @@ function createAdapter() {
 export const authOptions: NextAuthOptions = {
   adapter: createAdapter() as any,
   session: {
-    strategy: 'jwt', // Required for CredentialsProvider
+    strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   providers: [
@@ -123,7 +198,13 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async signIn({ user, account }) {
-      // Google OAuth: only allow @tbnpr.de
+      console.log('[Auth] signIn callback:', {
+        userId: user?.id,
+        email: user?.email,
+        provider: account?.provider,
+        type: account?.type,
+      })
+
       if (account?.provider === 'google') {
         const email = user.email || ''
         const domain = email.split('@')[1]
@@ -145,7 +226,6 @@ export const authOptions: NextAuthOptions = {
             }
           }
         } catch (error) {
-          // Don't block sign-in if role update fails
           console.error('[Auth] Error updating role during sign-in:', error)
         }
       }
@@ -153,15 +233,12 @@ export const authOptions: NextAuthOptions = {
     },
 
     async jwt({ token, user, account, trigger, session }) {
-      // Initial sign-in: add user data to token
       if (user) {
         token.id = user.id
         token.role = (user as any).role || 'USER'
         token.plan = (user as any).plan || null
       }
 
-      // For OAuth providers: the user object from the adapter might not have
-      // custom fields. Fetch from DB to be sure.
       if (account?.provider === 'google' && token.sub) {
         try {
           const dbUser = await prisma.user.findUnique({
@@ -177,7 +254,6 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // When session is updated (e.g., plan change)
       if (trigger === 'update' && session) {
         if (session.role) token.role = session.role
         if (session.plan !== undefined) token.plan = session.plan
@@ -196,9 +272,7 @@ export const authOptions: NextAuthOptions = {
     },
 
     async redirect({ url, baseUrl }) {
-      // Handle relative URLs
       if (url.startsWith('/')) return `${baseUrl}${url}`
-      // Allow callbacks to same origin
       if (new URL(url).origin === baseUrl) return url
       return baseUrl + '/dashboard'
     },
@@ -211,7 +285,6 @@ export const authOptions: NextAuthOptions = {
 
   events: {
     async createUser({ user }) {
-      // Auto-set TBN_STAFF for @tbnpr.de emails (Google OAuth creates user via adapter)
       const email = user.email || ''
       if (email.endsWith('@tbnpr.de')) {
         try {
@@ -227,7 +300,8 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
-  debug: false,
+  // Temporarily enabled for debugging OAuthAccountNotLinked
+  debug: true,
 
   logger: {
     error(code, metadata) {
