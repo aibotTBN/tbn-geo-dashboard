@@ -5,8 +5,68 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
 
+/**
+ * Custom adapter wrapper around PrismaAdapter.
+ * Overrides linkAccount to use Prisma directly, avoiding potential
+ * compatibility issues between @auth/prisma-adapter v2 (Auth.js v5)
+ * and NextAuth v4's account-linking flow.
+ */
+function createAdapter() {
+  const base = PrismaAdapter(prisma) as any
+
+  return {
+    ...base,
+
+    // Explicit linkAccount using Prisma to avoid v4/v5 adapter mismatch
+    async linkAccount(rawAccount: any) {
+      try {
+        const created = await prisma.account.create({
+          data: {
+            userId: rawAccount.userId,
+            type: rawAccount.type || 'oauth',
+            provider: rawAccount.provider,
+            providerAccountId: rawAccount.providerAccountId,
+            refresh_token: rawAccount.refresh_token ?? null,
+            access_token: rawAccount.access_token ?? null,
+            expires_at: rawAccount.expires_at
+              ? typeof rawAccount.expires_at === 'number'
+                ? rawAccount.expires_at
+                : parseInt(rawAccount.expires_at, 10)
+              : null,
+            token_type: rawAccount.token_type ?? null,
+            scope: rawAccount.scope ?? null,
+            id_token: rawAccount.id_token ?? null,
+            session_state: rawAccount.session_state?.toString() ?? null,
+          },
+        })
+        console.log(
+          `[Auth] Linked ${rawAccount.provider} account for user ${rawAccount.userId}`
+        )
+        return created
+      } catch (error: any) {
+        // P2002 = unique constraint violation → account already linked, just return it
+        if (error?.code === 'P2002') {
+          console.log(
+            `[Auth] Account already linked (${rawAccount.provider}/${rawAccount.providerAccountId})`
+          )
+          return prisma.account.findUnique({
+            where: {
+              provider_providerAccountId: {
+                provider: rawAccount.provider,
+                providerAccountId: rawAccount.providerAccountId,
+              },
+            },
+          })
+        }
+        console.error('[Auth] linkAccount error:', error)
+        throw error
+      }
+    },
+  }
+}
+
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
+  adapter: createAdapter() as any,
   session: {
     strategy: 'jwt', // Required for CredentialsProvider
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -57,7 +117,6 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      // Allow linking even if email already exists from another provider
       allowDangerousEmailAccountLinking: true,
     }),
   ],
