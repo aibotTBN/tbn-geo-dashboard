@@ -69,8 +69,11 @@ export function UpgradeNudge({ feature, title, children }: UpgradeNudgeProps) {
 export function UpgradeButton({ plan, className }: { plan: string; className?: string }) {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleUpgrade() {
+    setError('')
+
     if (!session?.user) {
       // Not authenticated — redirect to register with plan pre-selected
       window.location.href = `/register?plan=${plan.toLowerCase()}`
@@ -91,36 +94,40 @@ export function UpgradeButton({ plan, className }: { plan: string; className?: s
         window.location.href = data.url
       } else {
         console.error('Checkout error:', data.error)
-        // Fallback to register page
-        window.location.href = `/register?plan=${plan.toLowerCase()}`
+        setError(data.error || 'Zahlungssystem konnte nicht geladen werden. Bitte versuchen Sie es später erneut.')
       }
-    } catch (error) {
-      console.error('Checkout error:', error)
-      window.location.href = `/register?plan=${plan.toLowerCase()}`
+    } catch (err) {
+      console.error('Checkout error:', err)
+      setError('Verbindungsfehler. Bitte versuchen Sie es erneut.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Button
-      onClick={handleUpgrade}
-      className={`bg-radar-600 hover:bg-radar-700 ${className || ''}`}
-      size="sm"
-      disabled={loading}
-    >
-      {loading ? (
-        <>
-          <Loader2 size={16} className="mr-1 animate-spin" />
-          Laden…
-        </>
-      ) : (
-        <>
-          Upgrade auf {plan}
-          <ArrowUpRight size={16} className="ml-1" />
-        </>
+    <div className="inline-flex flex-col items-start gap-1">
+      <Button
+        onClick={handleUpgrade}
+        className={`bg-radar-600 hover:bg-radar-700 ${className || ''}`}
+        size="sm"
+        disabled={loading}
+      >
+        {loading ? (
+          <>
+            <Loader2 size={16} className="mr-1 animate-spin" />
+            Laden…
+          </>
+        ) : (
+          <>
+            Upgrade auf {plan}
+            <ArrowUpRight size={16} className="ml-1" />
+          </>
+        )}
+      </Button>
+      {error && (
+        <p className="text-xs text-red-600 max-w-xs">{error}</p>
       )}
-    </Button>
+    </div>
   )
 }
 
