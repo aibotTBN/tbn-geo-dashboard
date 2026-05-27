@@ -168,8 +168,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
-  // Temporarily enabled for debugging — set to false after fixing OAuth
-  debug: true,
+  debug: false,
 
   logger: {
     error(code, metadata) {
