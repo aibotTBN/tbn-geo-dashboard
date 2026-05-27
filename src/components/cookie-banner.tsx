@@ -54,7 +54,7 @@ export function CookieBanner() {
             <p className="text-xs text-gray-400 mt-1.5">
               Mehr dazu in unserer{' '}
               <a
-                href="https://tbnpr.de/datenschutzerklaerung"
+                href="/datenschutz"
                 target="_blank"
                 rel="noopener"
                 className="underline hover:text-gray-600"

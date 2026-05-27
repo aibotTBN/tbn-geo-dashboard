@@ -363,11 +363,11 @@ function RegisterForm() {
 
                 <p className="text-xs text-gray-400 text-center">
                   Mit der Registrierung akzeptieren Sie unsere{' '}
-                  <a href="https://tbnpr.de/impressum" target="_blank" rel="noopener" className="underline">
+                  <a href="/agb" target="_blank" rel="noopener" className="underline">
                     AGB
                   </a>{' '}
                   und{' '}
-                  <a href="https://tbnpr.de/datenschutzerklaerung" target="_blank" rel="noopener" className="underline">
+                  <a href="/datenschutz" target="_blank" rel="noopener" className="underline">
                     Datenschutzerklärung
                   </a>
                   . Die Zahlung erfolgt sicher über Stripe.

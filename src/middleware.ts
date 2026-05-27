@@ -37,6 +37,8 @@ export default withAuth(
           '/api/waitlist',
           '/api/webhooks',  // Stripe webhooks (signature-verified, no auth)
           '/api/stripe/checkout-session', // Allow post-registration checkout
+          '/agb',           // Legal: Terms of Service
+          '/datenschutz',   // Legal: Privacy Policy
         ]
 
         if (publicPaths.some(p => pathname.startsWith(p))) {

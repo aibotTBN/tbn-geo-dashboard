@@ -936,7 +936,8 @@ export default function LandingPage() {
               <span>Ein Produkt von <a href="https://tbnpr.de" className="text-gray-700 hover:text-blue-600 transition-colors font-medium" target="_blank" rel="noopener">TBN Public Relations GmbH</a></span>
               <span>•</span>
               <a href="https://tbnpr.de/impressum" className="hover:text-gray-700 transition-colors" target="_blank" rel="noopener">Impressum</a>
-              <a href="https://tbnpr.de/datenschutz" className="hover:text-gray-700 transition-colors" target="_blank" rel="noopener">Datenschutz</a>
+              <a href="/datenschutz" className="hover:text-gray-700 transition-colors">Datenschutz</a>
+              <a href="/agb" className="hover:text-gray-700 transition-colors">AGB</a>
             </div>
           </div>
           <p className="text-center text-xs text-gray-400 mt-8">

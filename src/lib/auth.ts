@@ -300,8 +300,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
-  // Temporarily enabled for debugging OAuthAccountNotLinked
-  debug: true,
+  debug: false,
 
   logger: {
     error(code, metadata) {
