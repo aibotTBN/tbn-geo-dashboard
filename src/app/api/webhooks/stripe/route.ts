@@ -101,7 +101,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return
   }
 
-  // Update user with plan and Stripe IDs
+  // Update user with plan, Stripe IDs, and auto-verify email (payment = identity confirmed)
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -109,6 +109,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       stripeSubId: subscriptionId,
       stripeCustomerId: customerId || undefined,
       planExpiresAt: null, // Managed by Stripe, no manual expiry
+      emailVerified: new Date(), // Auto-verify: user confirmed identity via Stripe payment
     },
   })
 

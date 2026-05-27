@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/dashboard?checkout=success&plan=${plan}`,
+      success_url: `${baseUrl}/login?checkout=success&plan=${plan}`,
       cancel_url: `${baseUrl}/register?checkout=cancelled`,
       metadata: {
         userId,

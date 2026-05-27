@@ -24,6 +24,7 @@ function LoginForm() {
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
   const errorParam = searchParams.get('error')
   const verifiedParam = searchParams.get('verified')
+  const checkoutSuccess = searchParams.get('checkout') === 'success'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -82,6 +83,14 @@ function LoginForm() {
 
         {/* Login Form */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 space-y-6">
+          {/* Checkout success message */}
+          {checkoutSuccess && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+              <CheckCircle2 size={16} />
+              Zahlung erfolgreich! Melden Sie sich jetzt an, um Ihr Dashboard zu öffnen.
+            </div>
+          )}
+
           {/* Verification success message */}
           {verifiedParam === 'true' && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
