@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { ArrowUpRight, Lock } from 'lucide-react'
+import { ArrowUpRight, Lock, Loader2, CreditCard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { hasFeature, requiredPlanFor, type PlanType } from '@/lib/plan-limits'
 import Link from 'next/link'
@@ -54,15 +55,123 @@ export function UpgradeNudge({ feature, title, children }: UpgradeNudgeProps) {
           <p className="text-sm text-gray-500 mb-4">
             Diese Funktion ist ab dem <strong>{requiredPlan}</strong>-Plan verfügbar.
           </p>
-          <Link href="/register">
-            <Button className="bg-radar-600 hover:bg-radar-700" size="sm">
-              Upgrade auf {requiredPlan}
-              <ArrowUpRight size={16} className="ml-1" />
-            </Button>
-          </Link>
+          <UpgradeButton plan={requiredPlan} />
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Upgrade button that either redirects to Stripe Checkout (if authenticated)
+ * or to the register page (if not).
+ */
+export function UpgradeButton({ plan, className }: { plan: string; className?: string }) {
+  const { data: session } = useSession()
+  const [loading, setLoading] = useState(false)
+
+  async function handleUpgrade() {
+    if (!session?.user) {
+      // Not authenticated — redirect to register with plan pre-selected
+      window.location.href = `/register?plan=${plan.toLowerCase()}`
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/stripe/checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan.toUpperCase() }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.url) {
+        window.location.href = data.url
+      } else {
+        console.error('Checkout error:', data.error)
+        // Fallback to register page
+        window.location.href = `/register?plan=${plan.toLowerCase()}`
+      }
+    } catch (error) {
+      console.error('Checkout error:', error)
+      window.location.href = `/register?plan=${plan.toLowerCase()}`
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Button
+      onClick={handleUpgrade}
+      className={`bg-radar-600 hover:bg-radar-700 ${className || ''}`}
+      size="sm"
+      disabled={loading}
+    >
+      {loading ? (
+        <>
+          <Loader2 size={16} className="mr-1 animate-spin" />
+          Laden…
+        </>
+      ) : (
+        <>
+          Upgrade auf {plan}
+          <ArrowUpRight size={16} className="ml-1" />
+        </>
+      )}
+    </Button>
+  )
+}
+
+/**
+ * Billing portal button — allows subscribed users to manage their subscription.
+ */
+export function BillingPortalButton({ className }: { className?: string }) {
+  const [loading, setLoading] = useState(false)
+
+  async function handleBillingPortal() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/stripe/billing-portal', {
+        method: 'POST',
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.url) {
+        window.location.href = data.url
+      } else {
+        console.error('Billing portal error:', data.error)
+        alert(data.error || 'Fehler beim Öffnen des Kundenportals')
+      }
+    } catch (error) {
+      console.error('Billing portal error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Button
+      onClick={handleBillingPortal}
+      variant="outline"
+      size="sm"
+      className={className}
+      disabled={loading}
+    >
+      {loading ? (
+        <>
+          <Loader2 size={16} className="mr-1 animate-spin" />
+          Laden…
+        </>
+      ) : (
+        <>
+          <CreditCard size={16} className="mr-1" />
+          Abo verwalten
+        </>
+      )}
+    </Button>
   )
 }
 

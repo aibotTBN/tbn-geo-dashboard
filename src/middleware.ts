@@ -35,7 +35,8 @@ export default withAuth(
           '/api/geo/check', // Free GEO check
           '/api/mcp',       // MCP server
           '/api/waitlist',
-          '/api/debug',     // Temporary: diagnostic endpoint
+          '/api/webhooks',  // Stripe webhooks (signature-verified, no auth)
+          '/api/stripe/checkout-session', // Allow post-registration checkout
         ]
 
         if (publicPaths.some(p => pathname.startsWith(p))) {

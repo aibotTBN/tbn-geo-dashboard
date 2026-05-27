@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import { AuthSessionProvider } from '@/components/providers/session-provider'
+import { CookieBanner } from '@/components/cookie-banner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -42,7 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             gtag('config', 'G-RSPTTB8D12');
           `}
         </Script>
-        <AuthSessionProvider>{children}</AuthSessionProvider>
+        <AuthSessionProvider>
+          {children}
+          <CookieBanner />
+        </AuthSessionProvider>
       </body>
     </html>
   )

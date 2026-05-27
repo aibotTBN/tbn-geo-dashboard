@@ -17,8 +17,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Shield,
+  CreditCard,
 } from 'lucide-react'
 import { PLAN_NAMES } from '@/lib/plan-limits'
+import { BillingPortalButton } from '@/components/geo/upgrade-nudge'
 
 const mainNav = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -37,6 +39,7 @@ export function Sidebar() {
   const userRole = (session?.user as any)?.role
   const userPlan = (session?.user as any)?.plan
   const isStaffOrAdmin = userRole === 'TBN_STAFF' || userRole === 'ADMIN'
+  const hasStripeSubscription = userPlan && !isStaffOrAdmin
 
   useEffect(() => {
     setMobileOpen(false)
@@ -134,7 +137,7 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* User */}
+        {/* User info + billing */}
         {session?.user && !collapsed && (
           <div className="px-4 py-3 border-t border-gray-100">
             <div className="flex items-center gap-3">
@@ -152,6 +155,12 @@ export function Sidebar() {
                 </p>
               </div>
             </div>
+            {/* Billing portal link for paying customers */}
+            {hasStripeSubscription && (
+              <div className="mt-2">
+                <BillingPortalButton className="w-full text-xs" />
+              </div>
+            )}
           </div>
         )}
       </aside>

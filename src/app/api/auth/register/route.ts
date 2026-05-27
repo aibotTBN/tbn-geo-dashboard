@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendVerificationEmail, sendWelcomeEmail } from '@/lib/email'
+import { isStripeConfigured } from '@/lib/stripe'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
@@ -41,9 +42,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine plan
-    let userPlan: 'STARTER' | 'PRO' | 'MANAGED' = 'STARTER'
+    let userPlan: 'STARTER' | 'PRO' | 'MANAGED' | null = null
     let planExpiry: Date | null = null
     let usedInviteCode: string | null = null
+    let requiresStripeCheckout = false
 
     if (inviteCode) {
       // Validate invite code
@@ -71,9 +73,16 @@ export async function POST(request: NextRequest) {
         data: { usedCount: { increment: 1 } },
       })
     } else if (plan && ['STARTER', 'PRO'].includes(plan)) {
-      userPlan = plan as 'STARTER' | 'PRO'
-      // Note: For paid plans without invite, Stripe checkout will be required after registration
-      // For now, we set the plan — Stripe integration will enforce payment later
+      // For paid plans without invite: plan is NOT activated yet.
+      // User must complete Stripe Checkout first.
+      // We store the plan as null until payment is confirmed via webhook.
+      if (isStripeConfigured()) {
+        requiresStripeCheckout = true
+        userPlan = null // Will be set by Stripe webhook after payment
+      } else {
+        // Stripe not configured — activate plan directly (dev/test mode)
+        userPlan = plan as 'STARTER' | 'PRO'
+      }
     }
 
     // Hash password
@@ -118,15 +127,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Send welcome email (best-effort, don't fail registration)
-    if (hasEmailSystem) {
+    if (hasEmailSystem && userPlan) {
       await sendWelcomeEmail(normalizedEmail, name, userPlan).catch(() => {})
     }
 
     return NextResponse.json({
       success: true,
-      message: autoVerified
-        ? 'Konto erstellt. Sie können sich jetzt anmelden.'
-        : 'Konto erstellt. Bitte bestätigen Sie Ihre E-Mail-Adresse.',
+      userId: user.id,
+      requiresStripeCheckout,
+      selectedPlan: plan || null,
+      message: requiresStripeCheckout
+        ? 'Konto erstellt. Bitte schließen Sie die Zahlung ab.'
+        : autoVerified
+          ? 'Konto erstellt. Sie können sich jetzt anmelden.'
+          : 'Konto erstellt. Bitte bestätigen Sie Ihre E-Mail-Adresse.',
       autoVerified,
     })
   } catch (error: any) {

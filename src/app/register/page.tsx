@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Radar, Eye, EyeOff, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react'
+import { Radar, Eye, EyeOff, AlertCircle, CheckCircle, ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 export default function RegisterPage() {
@@ -54,15 +54,16 @@ function RegisterForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const preselectedPlan = searchParams.get('plan')?.toUpperCase() || ''
+  const checkoutCancelled = searchParams.get('checkout') === 'cancelled'
 
-  const [step, setStep] = useState<'plan' | 'details' | 'success'>('plan')
+  const [step, setStep] = useState<'plan' | 'details' | 'success' | 'redirecting'>('plan')
   const [selectedPlan, setSelectedPlan] = useState(preselectedPlan || '')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(checkoutCancelled ? 'Zahlung abgebrochen. Bitte erneut versuchen.' : '')
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -79,6 +80,7 @@ function RegisterForm() {
     setError('')
 
     try {
+      // Step 1: Create account
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,12 +95,57 @@ function RegisterForm() {
         return
       }
 
+      // Step 2: If Stripe checkout is required, redirect to Stripe
+      if (data.requiresStripeCheckout && data.userId) {
+        setStep('redirecting')
+
+        const checkoutRes = await fetch('/api/stripe/checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            plan: data.selectedPlan || selectedPlan,
+            userId: data.userId,
+          }),
+        })
+
+        const checkoutData = await checkoutRes.json()
+
+        if (checkoutRes.ok && checkoutData.url) {
+          // Redirect to Stripe Checkout
+          window.location.href = checkoutData.url
+          return
+        } else {
+          // Stripe checkout creation failed — show success with email verification
+          console.error('[Register] Stripe checkout failed:', checkoutData.error)
+          setStep('success')
+          setLoading(false)
+          return
+        }
+      }
+
+      // No Stripe required (invite code or Stripe not configured)
       setStep('success')
     } catch {
       setError('Ein Fehler ist aufgetreten')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (step === 'redirecting') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-radar-50 via-white to-blue-50">
+        <div className="w-full max-w-md p-8">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 text-center">
+            <Loader2 size={48} className="animate-spin text-radar-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Weiterleitung zur Zahlung…</h2>
+            <p className="text-gray-600">
+              Sie werden zu unserem Zahlungsanbieter Stripe weitergeleitet.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (step === 'success') {
@@ -301,11 +348,19 @@ function RegisterForm() {
                   size="lg"
                   disabled={loading}
                 >
-                  {loading ? 'Konto wird erstellt…' : 'Konto erstellen'}
+                  {loading ? 'Konto wird erstellt…' : 'Weiter zur Zahlung'}
                 </Button>
 
                 <p className="text-xs text-gray-400 text-center">
-                  Mit der Registrierung akzeptieren Sie unsere Nutzungsbedingungen und Datenschutzerklärung.
+                  Mit der Registrierung akzeptieren Sie unsere{' '}
+                  <a href="https://tbnpr.de/impressum" target="_blank" rel="noopener" className="underline">
+                    AGB
+                  </a>{' '}
+                  und{' '}
+                  <a href="https://tbnpr.de/datenschutzerklaerung" target="_blank" rel="noopener" className="underline">
+                    Datenschutzerklärung
+                  </a>
+                  . Die Zahlung erfolgt sicher über Stripe.
                 </p>
               </form>
             </div>

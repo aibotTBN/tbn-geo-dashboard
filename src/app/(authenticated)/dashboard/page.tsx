@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScoreGauge, ScoreDimension } from '@/components/geo/score-gauge'
 import { Button } from '@/components/ui/button'
-import { FolderKanban, Search, Database, ArrowRight, Plus, Globe } from 'lucide-react'
+import { FolderKanban, Search, Database, ArrowRight, Plus, Globe, CheckCircle, X } from 'lucide-react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
+import { UpgradeButton } from '@/components/geo/upgrade-nudge'
 
 interface Project {
   id: string
@@ -28,6 +31,21 @@ interface Project {
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false)
+  const { data: session } = useSession()
+  const searchParams = useSearchParams()
+  const userPlan = (session?.user as any)?.plan
+  const userRole = (session?.user as any)?.role
+  const isStaff = userRole === 'TBN_STAFF' || userRole === 'ADMIN'
+  const noPlan = !isStaff && !userPlan
+
+  useEffect(() => {
+    if (searchParams.get('checkout') === 'success') {
+      setShowCheckoutSuccess(true)
+      // Clean URL without reload
+      window.history.replaceState({}, '', '/dashboard')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     fetch('/api/geo/projects')
@@ -46,6 +64,37 @@ export default function DashboardPage() {
     <>
       <Header title="Dashboard" />
       <div className="p-6 space-y-6">
+        {/* Checkout success banner */}
+        {showCheckoutSuccess && (
+          <div className="flex items-center justify-between p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 animate-in fade-in duration-500">
+            <div className="flex items-center gap-3">
+              <CheckCircle size={20} className="text-green-600" />
+              <div>
+                <p className="font-semibold">Zahlung erfolgreich!</p>
+                <p className="text-sm text-green-600">Ihr Abo ist aktiv. Willkommen bei LLM Radar!</p>
+              </div>
+            </div>
+            <button onClick={() => setShowCheckoutSuccess(false)} className="text-green-400 hover:text-green-600">
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* No plan — prompt to complete checkout */}
+        {noPlan && !showCheckoutSuccess && (
+          <div className="p-6 rounded-xl bg-gradient-to-r from-radar-50 to-blue-50 border border-radar-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Abo aktivieren</h3>
+            <p className="text-gray-600 mb-4">
+              Ihr Konto wurde erstellt, aber die Zahlung ist noch nicht abgeschlossen.
+              Wählen Sie einen Plan, um alle Funktionen von LLM Radar zu nutzen.
+            </p>
+            <div className="flex gap-3">
+              <UpgradeButton plan="Starter" />
+              <UpgradeButton plan="Pro" />
+            </div>
+          </div>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
