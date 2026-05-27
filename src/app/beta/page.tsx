@@ -831,7 +831,7 @@ export default function BetaPage() {
           <div className="flex items-center gap-4 text-xs text-gray-400">
             <span>Ein Produkt von <a href="https://tbnpr.de" className="hover:text-gray-600 transition-colors" target="_blank" rel="noopener">TBN Public Relations GmbH</a></span>
             <a href="https://tbnpr.de/impressum" className="hover:text-gray-600 transition-colors" target="_blank" rel="noopener">Impressum</a>
-            <a href="/datenschutz" className="hover:text-gray-600 transition-colors">Datenschutz</a>
+            <a href="/datenschutz" className="hover:text-gray-600 transition-colors" target="_blank" rel="noopener">Datenschutz</a>
             <a href="/agb" className="hover:text-gray-600 transition-colors">AGB</a>
           </div>
         </div>

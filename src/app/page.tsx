@@ -726,8 +726,7 @@ export default function LandingPage() {
               <div className="mb-6">
                 <span className="text-4xl font-extrabold text-gray-900">€99</span>
                 <span className="text-sm text-gray-500 ml-1">/Monat</span>
-                <p className="text-xs text-blue-600 font-medium mt-1">oder €79/Monat bei jährlicher Zahlung</p>
-                <p className="text-xs text-gray-400 mt-0.5">Monatlich kündbar</p>
+                <p className="text-xs text-gray-400 mt-0.5">zzgl. MwSt. · monatlich kündbar</p>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
                 {[
@@ -768,8 +767,7 @@ export default function LandingPage() {
               <div className="mb-6">
                 <span className="text-4xl font-extrabold text-gray-900">€499</span>
                 <span className="text-sm text-gray-500 ml-1">/Monat</span>
-                <p className="text-xs text-purple-600 font-medium mt-1">oder €399/Monat bei jährlicher Zahlung</p>
-                <p className="text-xs text-gray-400 mt-0.5">Monatlich kündbar</p>
+                <p className="text-xs text-gray-400 mt-0.5">zzgl. MwSt. · monatlich kündbar</p>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
                 {[
@@ -936,7 +934,7 @@ export default function LandingPage() {
               <span>Ein Produkt von <a href="https://tbnpr.de" className="text-gray-700 hover:text-blue-600 transition-colors font-medium" target="_blank" rel="noopener">TBN Public Relations GmbH</a></span>
               <span>•</span>
               <a href="https://tbnpr.de/impressum" className="hover:text-gray-700 transition-colors" target="_blank" rel="noopener">Impressum</a>
-              <a href="/datenschutz" className="hover:text-gray-700 transition-colors">Datenschutz</a>
+              <a href="/datenschutz" className="hover:text-gray-700 transition-colors" target="_blank" rel="noopener">Datenschutz</a>
               <a href="/agb" className="hover:text-gray-700 transition-colors">AGB</a>
             </div>
           </div>

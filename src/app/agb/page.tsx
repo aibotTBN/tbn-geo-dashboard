@@ -322,7 +322,7 @@ export default function AGBPage() {
             </div>
             <div className="flex items-center gap-6 text-sm text-gray-500">
               <a href="https://tbnpr.de/impressum" className="hover:text-gray-700 transition-colors" target="_blank" rel="noopener">Impressum</a>
-              <a href="/datenschutz" className="hover:text-gray-700 transition-colors">Datenschutz</a>
+              <a href="/datenschutz" className="hover:text-gray-700 transition-colors" target="_blank" rel="noopener">Datenschutz</a>
               <a href="/agb" className="hover:text-gray-700 transition-colors font-medium text-gray-700">AGB</a>
             </div>
           </div>
