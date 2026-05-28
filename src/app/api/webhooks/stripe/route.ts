@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { stripe, getPlanFromPriceId } from '@/lib/stripe'
+import { pushCustomer } from '@/lib/mailingwork'
 import type Stripe from 'stripe'
 
 /**
@@ -114,6 +115,17 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   })
 
   console.log(`[Stripe] User ${userId} activated: plan=${activePlan}, sub=${subscriptionId}`)
+
+  // Push new customer to Mailingwork Liste 25 (non-blocking)
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (user?.email) {
+    pushCustomer({
+      email: user.email,
+      name: user.name || undefined,
+    }).catch((err) => {
+      console.error('[Mailingwork] Customer push failed (non-blocking):', err)
+    })
+  }
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {

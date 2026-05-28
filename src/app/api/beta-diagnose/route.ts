@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { triggerDiagnose } from '@/lib/n8n'
 import { prisma } from '@/lib/prisma'
+import { pushLead } from '@/lib/mailingwork'
 
 /**
  * Beta Diagnose — unauthenticated, rate-limited GEO analysis.
@@ -113,6 +114,11 @@ export async function POST(request: NextRequest) {
     } catch {
       // Non-critical — email may already exist
     }
+
+    // Push lead to Mailingwork Liste 25 (non-blocking)
+    pushLead({ email, domain }).catch((err) => {
+      console.error('[Mailingwork] Lead push failed (non-blocking):', err)
+    })
 
     // Send Slack notification
     const slackWebhookUrl = process.env.SLACK_WAITLIST_WEBHOOK_URL
