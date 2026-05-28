@@ -37,6 +37,8 @@ export default withAuth(
           '/api/waitlist',
           '/api/webhooks',  // Stripe webhooks (signature-verified, no auth)
           '/api/stripe/checkout-session', // Allow post-registration checkout
+          '/api/beta',      // Free beta analysis API
+          '/beta',          // Free beta analysis page
           '/agb',           // Legal: Terms of Service
           '/datenschutz',   // Legal: Privacy Policy
         ]
