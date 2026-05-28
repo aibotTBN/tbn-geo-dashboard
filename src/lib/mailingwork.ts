@@ -34,33 +34,55 @@ interface MailingworkResponse {
   result: any
 }
 
+/**
+ * Check if Mailingwork credentials are configured.
+ */
+export function isMailingworkConfigured(): boolean {
+  return !!(process.env.MAILINGWORK_USERNAME && process.env.MAILINGWORK_PASSWORD)
+}
+
 async function mwCall(fn: string, params: Record<string, string>): Promise<MailingworkResponse> {
   const username = process.env.MAILINGWORK_USERNAME
   const password = process.env.MAILINGWORK_PASSWORD
 
   if (!username || !password) {
-    console.warn('[Mailingwork] Credentials not configured — skipping')
+    console.error('[Mailingwork] ❌ MAILINGWORK_USERNAME or MAILINGWORK_PASSWORD not set in env — skipping API call')
     return { error: -1, message: 'Not configured', result: null }
   }
 
-  const body = new URLSearchParams({
+  // Build form-encoded body (same format as PHP-style form params)
+  const allParams: Record<string, string> = {
     username,
     password,
     ...params,
-  })
+  }
+
+  // Use manual encoding to ensure brackets are NOT double-encoded
+  const bodyParts: string[] = []
+  for (const [key, value] of Object.entries(allParams)) {
+    bodyParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+  }
+  const bodyStr = bodyParts.join('&')
+
+  console.log(`[Mailingwork] Calling ${fn} with ${Object.keys(params).length} params`)
 
   const resp = await fetch(`${MW_API_BASE}${fn}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
+    body: bodyStr,
   })
 
   if (!resp.ok) {
-    console.error(`[Mailingwork] HTTP ${resp.status} for ${fn}`)
+    const text = await resp.text().catch(() => '')
+    console.error(`[Mailingwork] HTTP ${resp.status} for ${fn}: ${text.slice(0, 200)}`)
     return { error: -1, message: `HTTP ${resp.status}`, result: null }
   }
 
-  return resp.json()
+  const json = await resp.json() as MailingworkResponse
+  if (json.error !== 0) {
+    console.warn(`[Mailingwork] ${fn} returned error ${json.error}: ${json.message}`)
+  }
+  return json
 }
 
 /**
