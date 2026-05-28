@@ -320,12 +320,18 @@ function ReadableReport({ reportJson, domain }: { reportJson: string; domain: st
       color: 'text-amber-600',
       content: (
         <div className="space-y-2">
-          {recommendations.map((rec: string, i: number) => (
-            <div key={i} className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
-              <span className="text-amber-600 font-bold text-sm mt-0.5">{i + 1}.</span>
-              <p className="text-sm text-gray-700">{rec}</p>
-            </div>
-          ))}
+          {recommendations.map((rec: any, i: number) => {
+            // Handle both string and object recommendations
+            const text = typeof rec === 'string'
+              ? rec
+              : rec?.text || rec?.title || rec?.description || rec?.recommendation || JSON.stringify(rec)
+            return (
+              <div key={i} className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                <span className="text-amber-600 font-bold text-sm mt-0.5">{i + 1}.</span>
+                <p className="text-sm text-gray-700">{text}</p>
+              </div>
+            )
+          })}
         </div>
       ),
     })

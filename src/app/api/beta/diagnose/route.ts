@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { triggerDiagnose } from '@/lib/n8n'
 import { prisma } from '@/lib/prisma'
+import { pushLead } from '@/lib/mailingwork'
 
 /**
  * Beta Diagnose — unauthenticated, rate-limited GEO analysis.
@@ -71,36 +72,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.' }, { status: 429 })
     }
 
-    // Check if this domain was already analyzed in the last 24h (for free tier)
-    try {
-      const existingProject = await prisma.project.findUnique({ where: { domain } })
-      if (existingProject) {
-        const recentDiagnosis = await prisma.diagnosis.findFirst({
-          where: {
-            projectId: existingProject.id,
-            createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-          },
-          orderBy: { createdAt: 'desc' },
-        })
-        if (recentDiagnosis) {
-          // Return cached result instead of re-running
-          return NextResponse.json({
-            score: recentDiagnosis.score,
-            scoreCitation: recentDiagnosis.scoreCitation,
-            scoreTech: recentDiagnosis.scoreTech,
-            scoreSchema: recentDiagnosis.scoreSchema,
-            scoreContent: recentDiagnosis.scoreContent,
-            scoreFresh: recentDiagnosis.scoreFresh,
-            reportJson: recentDiagnosis.reportJson,
-            cached: true,
-          })
-        }
-      }
-    } catch {
-      // DB check failed — proceed with fresh analysis
-    }
-
-    // Save email to waitlist (non-blocking)
+    // ── Always capture lead data (before cache check) ───────────────
+    // Save email to waitlist
     try {
       const existingEntry = await prisma.waitlistEntry.findUnique({ where: { email } })
       if (!existingEntry) {
@@ -110,6 +83,14 @@ export async function POST(request: NextRequest) {
       }
     } catch {
       // Non-critical — email may already exist
+    }
+
+    // Push lead to Mailingwork Liste 25
+    try {
+      const mwResult = await pushLead({ email, domain })
+      console.log(`[Mailingwork] pushLead result for ${email}:`, JSON.stringify(mwResult))
+    } catch (mwErr) {
+      console.error('[Mailingwork] pushLead threw:', mwErr)
     }
 
     // Send Slack notification
@@ -126,6 +107,34 @@ export async function POST(request: NextRequest) {
       } catch {
         // Non-critical
       }
+    }
+
+    // ── Check cache (return early if recent result exists) ────────
+    try {
+      const existingProject = await prisma.project.findUnique({ where: { domain } })
+      if (existingProject) {
+        const recentDiagnosis = await prisma.diagnosis.findFirst({
+          where: {
+            projectId: existingProject.id,
+            createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+        if (recentDiagnosis) {
+          return NextResponse.json({
+            score: recentDiagnosis.score,
+            scoreCitation: recentDiagnosis.scoreCitation,
+            scoreTech: recentDiagnosis.scoreTech,
+            scoreSchema: recentDiagnosis.scoreSchema,
+            scoreContent: recentDiagnosis.scoreContent,
+            scoreFresh: recentDiagnosis.scoreFresh,
+            reportJson: recentDiagnosis.reportJson,
+            cached: true,
+          })
+        }
+      }
+    } catch {
+      // DB check failed — proceed with fresh analysis
     }
 
     // Ensure project exists
