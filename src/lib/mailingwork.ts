@@ -70,6 +70,7 @@ async function mwCall(fn: string, params: Record<string, string>): Promise<Maili
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: bodyStr,
+    cache: 'no-store',  // Prevent Next.js fetch patching from interfering
   })
 
   if (!resp.ok) {
