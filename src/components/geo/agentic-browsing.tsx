@@ -202,7 +202,7 @@ export function AgenticBrowsingCheck({ domain }: { domain: string }) {
       const result = await res.json()
       setData(result)
       // Auto-expand failed audits
-      const failedIds = new Set(result.audits.filter((a: AuditResult) => a.passed === false).map((a: AuditResult) => a.id))
+      const failedIds = new Set<string>(result.audits.filter((a: AuditResult) => a.passed === false).map((a: AuditResult) => a.id))
       setExpandedAudits(failedIds)
     } catch (e) {
       setError((e as Error).message)
