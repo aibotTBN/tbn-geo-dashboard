@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Info, X, Eye, Shield, FileText, Sparkles, Clock, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
+import { Info, X, Eye, Shield, FileText, Sparkles, Clock, ChevronDown, ChevronUp, ExternalLink, Bot } from 'lucide-react'
 
 /**
  * Methodology data for each GEO Score dimension.
@@ -96,6 +96,27 @@ const DIMENSIONS: {
     ],
     dataSource: 'KI-gestützte Analyse der gecrawlten Seiteninhalte (Text, Überschriften, Strukturelemente)',
     tip: 'Erstellen Sie regelmäßig Fachbeiträge mit klarer Autorschaft und strukturierten Inhalten. Case Studies und datengestützte Artikel haben die höchste Wirkung.',
+  },
+  {
+    key: 'agentic',
+    label: 'Agentic Browsing',
+    maxScore: 0, // pass/fail, no point score
+    icon: Bot,
+    color: 'text-indigo-600',
+    shortDesc: 'Ist Ihre Website bereit für KI-Agenten, die autonom im Web navigieren?',
+    methodology:
+      'Seit Mai 2026 enthält Chrome Lighthouse 13.3 neun „Agentic Browsing"-Audits. Diese prüfen, ob eine Website maschinenlesbare Dateien und Annotationen bereitstellt, die autonomen KI-Agenten die Navigation, Interaktion und Datenextraktion ermöglichen. Die Bewertung ist Pass/Fail pro Audit — kein gewichteter Score.',
+    criteria: [
+      'llms.txt vorhanden und wohlgeformt (Markdown-Spec)',
+      'agents.json vorhanden mit typisierten Actions',
+      'Sitemap auffindbar (XML + robots.txt Referenz)',
+      'Agent-Runbook / Instructions-Datei',
+      'Auto-Discovery <link>-Tags im HTML <head>',
+      'Schema.org-Dichte (≥ 2 JSON-LD Blöcke)',
+      'WebMCP-Annotationen (Spec in Entwicklung)',
+    ],
+    dataSource: 'Direkter Check der Website-Dateien und HTML-Struktur — angelehnt an Lighthouse 13.3 Agentic Browsing Scoring',
+    tip: 'Die neuen Standards (agents.json, Agent-Runbook) sind noch wenig verbreitet — wer sie jetzt implementiert, sichert sich einen First-Mover-Vorteil bei der nächsten Welle von KI-Agenten.',
   },
   {
     key: 'fresh',
@@ -219,8 +240,8 @@ export function MethodologyPanel() {
       </div>
 
       <p className="text-xs text-gray-500 leading-relaxed">
-        Der GEO Score (0–100) bewertet Ihre Website in 5 Dimensionen. Jede Dimension misst einen anderen Aspekt 
-        Ihrer KI-Sichtbarkeit. Klicken Sie auf eine Dimension, um die genauen Prüfkriterien und Datenquellen zu sehen.
+        Der GEO Score (0–100) bewertet Ihre Website in 5 Dimensionen. Zusätzlich prüft der Lighthouse Agentic Browsing Check 
+        9 Audits für KI-Agenten-Readiness (Pass/Fail). Klicken Sie auf eine Dimension, um die genauen Prüfkriterien und Datenquellen zu sehen.
       </p>
 
       <div className="space-y-2">

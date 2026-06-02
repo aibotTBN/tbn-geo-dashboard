@@ -149,3 +149,104 @@ export async function sendWelcomeEmail(email: string, name: string | null, plan:
     `,
   })
 }
+
+// ─── Monitoring Alert Email ──────────────────────────────────────────────────
+
+interface MonitoringAlertData {
+  domain: string
+  newScore: number
+  oldScore: number | null
+  scoreDelta: number | null
+  scoreCitation: number
+  scoreTech: number
+  scoreSchema: number
+  scoreContent: number
+  scoreFresh: number
+  recommendations: string[]
+}
+
+export async function sendMonitoringAlertEmail(
+  email: string,
+  data: MonitoringAlertData
+): Promise<boolean> {
+  const baseUrl = process.env.NEXTAUTH_URL || 'https://llmradar.de'
+  const dashboardUrl = `${baseUrl}/projekte/${data.domain}`
+
+  const deltaStr = data.scoreDelta !== null
+    ? (data.scoreDelta >= 0 ? `+${data.scoreDelta}` : `${data.scoreDelta}`)
+    : '—'
+  const deltaColor = (data.scoreDelta ?? 0) >= 0 ? '#22c55e' : '#ef4444'
+
+  const scoreColor = (s: number) => {
+    if (s < 30) return '#ef4444'
+    if (s < 50) return '#f97316'
+    if (s < 70) return '#eab308'
+    return '#22c55e'
+  }
+
+  const recHtml = data.recommendations.length > 0
+    ? `
+      <h3 style="color: #1e293b; font-size: 16px; margin-top: 24px;">Empfehlungen</h3>
+      <ul style="color: #475569; line-height: 1.8; padding-left: 20px;">
+        ${data.recommendations.slice(0, 5).map(r => `<li>${r}</li>`).join('')}
+      </ul>`
+    : ''
+
+  return sendEmail({
+    to: email,
+    subject: `LLM Radar Monitoring – ${data.domain}: Score ${data.newScore}/100 (${deltaStr})`,
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h1 style="color: #0f172a; font-size: 24px; margin: 0;">🔍 LLM Radar</h1>
+          <p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0;">Monitoring-Bericht</p>
+        </div>
+
+        <h2 style="color: #1e293b; font-size: 20px;">GEO Score Update: ${data.domain}</h2>
+
+        <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 20px 0; text-align: center;">
+          <div style="font-size: 48px; font-weight: 800; color: ${scoreColor(data.newScore)};">${data.newScore}</div>
+          <div style="color: #94a3b8; font-size: 14px;">von 100 Punkten</div>
+          ${data.scoreDelta !== null ? `<div style="color: ${deltaColor}; font-size: 16px; font-weight: 600; margin-top: 8px;">${deltaStr} seit letzter Prüfung</div>` : ''}
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 8px 0; color: #475569; font-size: 14px;">KI-Sichtbarkeit</td>
+            <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #1e293b;">${data.scoreCitation}/30</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 8px 0; color: #475569; font-size: 14px;">Tech GEO-Dateien</td>
+            <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #1e293b;">${data.scoreTech}/20</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 8px 0; color: #475569; font-size: 14px;">Schema Markup</td>
+            <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #1e293b;">${data.scoreSchema}/20</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 8px 0; color: #475569; font-size: 14px;">Content-Qualität</td>
+            <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #1e293b;">${data.scoreContent}/15</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #475569; font-size: 14px;">Content-Freshness</td>
+            <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #1e293b;">${data.scoreFresh}/15</td>
+          </tr>
+        </table>
+
+        ${recHtml}
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${dashboardUrl}" 
+             style="background-color: #4f46e5; color: #ffffff; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+            Details im Dashboard ansehen
+          </a>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 32px 0;" />
+        <p style="color: #cbd5e1; font-size: 11px; text-align: center;">
+          LLM Radar by TBN Public Relations GmbH · <a href="${baseUrl}/projekte/${data.domain}" style="color: #94a3b8;">Monitoring-Einstellungen ändern</a>
+        </p>
+      </div>
+    `,
+  })
+}

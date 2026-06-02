@@ -22,6 +22,7 @@ import { LlmAnswers } from '@/components/geo/llm-answers'
 import { MethodologyPanel } from '@/components/geo/methodology-info'
 import { GoogleReadinessCheck } from '@/components/geo/google-readiness'
 import { McpAnalytics } from '@/components/geo/mcp-analytics'
+import { AgenticBrowsingCheck } from '@/components/geo/agentic-browsing'
 
 const ENTITY_ICONS: Record<string, any> = {
   geo_organizations: Building2,
@@ -831,6 +832,13 @@ export default function ProjectDetailPage() {
         <Card>
           <CardContent className="pt-6">
             <GoogleReadinessCheck domain={domain} />
+          </CardContent>
+        </Card>
+
+        {/* Lighthouse Agentic Browsing Audit */}
+        <Card>
+          <CardContent className="pt-6">
+            <AgenticBrowsingCheck domain={domain} />
           </CardContent>
         </Card>
 
