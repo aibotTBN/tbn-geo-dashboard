@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Loader2, CheckCircle2, XCircle, AlertCircle, MinusCircle,
   ChevronDown, ChevronUp, RefreshCw, ExternalLink, Shield,
@@ -187,8 +187,33 @@ function PassRatioBadge({ passCount, gradedCount }: { passCount: number; gradedC
 export function AgenticBrowsingCheck({ domain }: { domain: string }) {
   const [data, setData] = useState<AgenticBrowsingData | null>(null)
   const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedAudits, setExpandedAudits] = useState<Set<string>>(new Set())
+
+  // Auto-load persisted results on mount
+  useEffect(() => {
+    async function loadSaved() {
+      try {
+        const res = await fetch(`/api/geo/agentic-browsing?domain=${encodeURIComponent(domain)}&load=1`)
+        if (res.ok) {
+          const { saved } = await res.json()
+          if (saved) {
+            setData(saved)
+            const failedIds = new Set<string>(
+              saved.audits.filter((a: AuditResult) => a.passed === false).map((a: AuditResult) => a.id)
+            )
+            setExpandedAudits(failedIds)
+          }
+        }
+      } catch {
+        // Silent — will just show "not yet checked" state
+      } finally {
+        setInitialLoading(false)
+      }
+    }
+    loadSaved()
+  }, [domain])
 
   const runCheck = async () => {
     setLoading(true)
@@ -227,6 +252,22 @@ export function AgenticBrowsingCheck({ domain }: { domain: string }) {
     } else {
       setExpandedAudits(new Set(data.audits.map(a => a.id)))
     }
+  }
+
+  /* ─── Initial loading ─── */
+  if (initialLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Shield size={18} className="text-indigo-600" />
+          <h3 className="text-base font-semibold text-gray-900">Lighthouse Agentic Browsing</h3>
+        </div>
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
+          <Loader2 size={24} className="mx-auto text-gray-400 animate-spin mb-2" />
+          <p className="text-xs text-gray-400">Lade gespeicherte Ergebnisse…</p>
+        </div>
+      </div>
+    )
   }
 
   /* ─── Not yet checked ─── */

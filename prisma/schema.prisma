@@ -139,6 +139,7 @@ model Diagnosis {
   scoreContent  Int      // max 15
   scoreFresh    Int      // max 15
   reportJson    String?  @db.Text // Full report JSON from n8n
+  agenticBrowsingJson String? @db.Text // Lighthouse Agentic Browsing audit results JSON
   createdAt     DateTime @default(now())
 
   @@index([projectId, createdAt])
