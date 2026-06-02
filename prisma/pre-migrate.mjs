@@ -150,6 +150,13 @@ async function main() {
     }
     console.log('  ✓ Project OK')
 
+    // ── 4b. Add missing Diagnosis columns ─────────────────────
+    console.log('[Pre-migrate] Step 4b: Diagnosis columns...')
+    if (await tableExists('Diagnosis')) {
+      await addColumn('Diagnosis', 'agenticBrowsingJson', 'TEXT', null)
+    }
+    console.log('  ✓ Diagnosis OK')
+
     // ── 5. Create missing tables ─────────────────────────────
     console.log('[Pre-migrate] Step 5: Missing tables...')
 

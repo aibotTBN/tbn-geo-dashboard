@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 /**
  * Agentic Browsing Audit API — maps to Lighthouse 13.3 "Agentic Browsing" audits.
  * Runs independently (like Google Readiness Check), no n8n dependency.
  *
- * GET /api/geo/agentic-browsing?domain=example.com
+ * GET /api/geo/agentic-browsing?domain=example.com          — run fresh audit & save
+ * GET /api/geo/agentic-browsing?domain=example.com&load=1   — load last saved result
  *
  * Returns pass/fail for each of the 9 Lighthouse Agentic Browsing audits:
  *   1. llms-txt-present
@@ -497,9 +499,27 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const domain = searchParams.get('domain')
+  const loadOnly = searchParams.get('load') === '1'
 
   if (!domain) return NextResponse.json({ error: 'Domain required' }, { status: 400 })
 
+  // ── Load-only mode: return last persisted result ──
+  if (loadOnly) {
+    try {
+      const project = await prisma.project.findUnique({ where: { domain } })
+      if (!project) return NextResponse.json({ saved: null })
+      const latest = await prisma.diagnosis.findFirst({
+        where: { projectId: project.id, agenticBrowsingJson: { not: null } },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (!latest?.agenticBrowsingJson) return NextResponse.json({ saved: null })
+      return NextResponse.json({ saved: JSON.parse(latest.agenticBrowsingJson) })
+    } catch {
+      return NextResponse.json({ saved: null })
+    }
+  }
+
+  // ── Run fresh audit ──
   // Run all audits (parallelize where possible)
   const [
     { audit: llmsTxtAudit, body: llmsTxtBody },
@@ -538,7 +558,7 @@ export async function GET(request: NextRequest) {
   const passedCount = audits.filter(a => a.passed === true).length
   const skippedCount = audits.filter(a => a.passed === null).length
 
-  return NextResponse.json({
+  const result = {
     domain,
     audits,
     summary: {
@@ -550,5 +570,26 @@ export async function GET(request: NextRequest) {
       lighthouseLabel: `Agentic Browsing: ${passedCount}/${gradedAudits.length}`,
     },
     checkedAt: new Date().toISOString(),
-  })
+  }
+
+  // ── Persist to latest Diagnosis (if project exists) ──
+  try {
+    const project = await prisma.project.findUnique({ where: { domain } })
+    if (project) {
+      const latestDiagnosis = await prisma.diagnosis.findFirst({
+        where: { projectId: project.id },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (latestDiagnosis) {
+        await prisma.diagnosis.update({
+          where: { id: latestDiagnosis.id },
+          data: { agenticBrowsingJson: JSON.stringify(result) },
+        })
+      }
+    }
+  } catch {
+    // Persistence failure shouldn't break the response
+  }
+
+  return NextResponse.json(result)
 }
