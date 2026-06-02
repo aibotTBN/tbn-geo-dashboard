@@ -263,7 +263,7 @@ export default function LandingPage() {
 
             <p className="mt-6 text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
               ChatGPT, Gemini und Claude beantworten jeden Tag Millionen Fragen über Unternehmen wie Ihres.
-              LLM Radar zeigt Ihnen, <strong>was diese KI-Systeme über Sie wissen</strong> — und wie Sie es verbessern.
+              LLM Radar zeigt Ihnen, <strong>was diese KI-Systeme über Sie wissen</strong> — und ob Ihre Website bereit für die nächste Welle autonomer KI-Agenten ist.
             </p>
 
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4" id="hero-cta">
@@ -437,14 +437,15 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-4 py-1.5 mb-4">
               <BarChart3 className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-700">5 Dimensionen, 1 Score</span>
+              <span className="text-sm font-medium text-blue-700">5 Dimensionen + Agentic Browsing Audit</span>
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
               Ihre KI-Sichtbarkeit —<br className="hidden sm:block" /> messbar und steuerbar
             </h2>
             <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-              LLM Radar analysiert Ihre Website in fünf Dimensionen und berechnet daraus einen Gesamt-Score, 
-              den Sie kontinuierlich verbessern und monitoren können.
+              LLM Radar analysiert Ihre Website in fünf Dimensionen und berechnet daraus einen Gesamt-Score. 
+              Zusätzlich prüft der <strong>Lighthouse Agentic Browsing Check</strong> (seit Mai 2026 in Chrome), 
+              ob Ihre Website bereit für autonome KI-Agenten ist.
             </p>
           </div>
 
@@ -481,9 +482,9 @@ export default function LandingPage() {
                 color: 'bg-orange-500',
               },
               {
-                icon: Zap,
-                title: 'GEO Score',
-                desc: 'Alle Dimensionen fließen in einen Gesamtwert. Monitoren Sie Ihre Entwicklung, vergleichen Sie sich mit der Branche.',
+                icon: Bot,
+                title: 'Agentic Browsing Audit',
+                desc: 'Der neue Lighthouse-Standard (Mai 2026): 9 Checks prüfen, ob KI-Agenten Ihre Website autonom navigieren können — von llms.txt bis agents.json.',
                 color: 'bg-blue-600',
               },
             ].map((feature) => (
@@ -875,6 +876,10 @@ export default function LandingPage() {
             <FAQItem
               question="Was ist der Managed-Service?"
               answer="Im Managed-Tarif übernimmt das TBN-Team die vollständige Pflege Ihrer Knowledge Base, erstellt monatliche GEO-Reports mit Handlungsempfehlungen, führt quartalsweise Strategie-Calls durch und gibt konkrete Content-Empfehlungen. Ideal für Unternehmen, die das Thema KI-Sichtbarkeit professionell angehen möchten, ohne interne Ressourcen aufzubauen."
+            />
+            <FAQItem
+              question="Was ist der Agentic Browsing Audit?"
+              answer="Seit Mai 2026 enthält Chrome Lighthouse 13.3 neun neue Audits unter dem Namen ‚Agentic Browsing Scoring'. Diese prüfen, ob Ihre Website Dateien und Annotationen bereitstellt, die autonomen KI-Agenten die Navigation ermöglichen — z.B. llms.txt, agents.json, Agent-Runbooks und Schema.org-Dichte. LLM Radar führt alle 9 Checks automatisch durch und zeigt Ihnen, welche bestanden sind und wo Handlungsbedarf besteht. Da bisher weniger als 10% der Top-Domains diese Standards erfüllen, sichern Sie sich mit einer frühen Implementierung einen klaren Wettbewerbsvorteil."
             />
             <FAQItem
               question="Kann ich LLM Radar kostenlos testen?"

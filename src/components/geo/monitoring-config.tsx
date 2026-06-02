@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Activity, Bell, Clock, Mail, MessageSquare, Save, CheckCircle } from "lucide-react"
+import { Activity, Bell, Clock, Mail, Save, CheckCircle } from "lucide-react"
 
 interface MonitoringSettings {
   monitoringEnabled: boolean
@@ -159,35 +159,22 @@ export function MonitoringConfig({ domain }: MonitoringConfigProps) {
               </div>
             </div>
 
-            {/* Alert channels */}
+            {/* Alert channels — Email only */}
             <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">Benachrichtigungen</p>
-              <div className="space-y-2">
-                <div
-                  className="flex items-center justify-between p-2 rounded-lg border cursor-pointer hover:bg-gray-50"
-                  onClick={() => setSettings({ ...settings, alertSlack: !settings.alertSlack })}
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm">Slack (#geo)</span>
-                  </div>
-                  <div className={`h-4 w-4 rounded border flex items-center justify-center ${
-                    settings.alertSlack ? "bg-indigo-500 border-indigo-500" : "border-gray-300"
-                  }`}>
-                    {settings.alertSlack && <CheckCircle className="h-3 w-3 text-white" />}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-2 rounded-lg border">
-                  <Mail className="h-4 w-4 text-gray-500" />
-                  <input
-                    type="email"
-                    placeholder="E-Mail (optional)"
-                    value={settings.alertEmail || ""}
-                    onChange={e => setSettings({ ...settings, alertEmail: e.target.value || null })}
-                    className="flex-1 text-sm bg-transparent outline-none"
-                  />
-                </div>
+              <p className="text-sm font-medium text-gray-700">Benachrichtigungen per E-Mail</p>
+              <div className="flex items-center gap-2 p-2 rounded-lg border">
+                <Mail className="h-4 w-4 text-gray-500" />
+                <input
+                  type="email"
+                  placeholder="E-Mail-Adresse für Alerts"
+                  value={settings.alertEmail || ""}
+                  onChange={e => setSettings({ ...settings, alertEmail: e.target.value || null, alertSlack: false })}
+                  className="flex-1 text-sm bg-transparent outline-none"
+                />
               </div>
+              <p className="text-xs text-gray-400">
+                Sie erhalten eine E-Mail, wenn sich Ihr Score um mehr als {settings.alertThreshold} Punkte ändert.
+              </p>
             </div>
           </>
         )}
