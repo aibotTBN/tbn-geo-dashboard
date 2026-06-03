@@ -105,18 +105,17 @@ const DIMENSIONS: {
     color: 'text-indigo-600',
     shortDesc: 'Ist Ihre Website bereit für KI-Agenten, die autonom im Web navigieren?',
     methodology:
-      'Seit Mai 2026 enthält Chrome Lighthouse 13.3 neun „Agentic Browsing"-Audits. Diese prüfen, ob eine Website maschinenlesbare Dateien und Annotationen bereitstellt, die autonomen KI-Agenten die Navigation, Interaktion und Datenextraktion ermöglichen. Die Bewertung ist Pass/Fail pro Audit — kein gewichteter Score.',
+      'Chrome Lighthouse enthält sechs „Agentic Browsing"-Audits (Pass/Fail). Diese prüfen, ob eine Website für autonome KI-Agenten navigierbar ist — über maschinenlesbare Beschreibungen, WebMCP-Tool-Registrierung, Barrierefreiheit und Layout-Stabilität.',
     criteria: [
-      'llms.txt vorhanden und wohlgeformt (Markdown-Spec)',
-      'agents.json vorhanden mit typisierten Actions',
-      'Sitemap auffindbar (XML + robots.txt Referenz)',
-      'Agent-Runbook / Instructions-Datei',
-      'Auto-Discovery <link>-Tags im HTML <head>',
-      'Schema.org-Dichte (≥ 2 JSON-LD Blöcke)',
-      'WebMCP-Annotationen (Spec in Entwicklung)',
+      'llms.txt vorhanden und wohlgeformt (Markdown-Spec gemäß llmstxt.org)',
+      'Registrierte WebMCP-Tools (deklarativ oder imperativ)',
+      'Formulare mit WebMCP-Annotationen',
+      'WebMCP-Schema-Validität',
+      'Barrierefreiheit für Agenten (ARIA, Landmarks, Labels)',
+      'Layout-Stabilität (CLS — Bilder mit Dimensionen, font-display)',
     ],
-    dataSource: 'Direkter Check der Website-Dateien und HTML-Struktur — angelehnt an Lighthouse 13.3 Agentic Browsing Scoring',
-    tip: 'Die neuen Standards (agents.json, Agent-Runbook) sind noch wenig verbreitet — wer sie jetzt implementiert, sichert sich einen First-Mover-Vorteil bei der nächsten Welle von KI-Agenten.',
+    dataSource: 'Direkter Check der Website: llms.txt-Datei, HTML-Struktur (WebMCP, A11y, CLS-Indikatoren) — gemäß Lighthouse Agentic Browsing Scoring',
+    tip: 'WebMCP ist das Kernstück: Registrieren Sie Tools und annotieren Sie Formulare, damit KI-Agenten Ihre Website nutzen können. llms.txt aus dem Knowledge Layer ist der schnellste Quick Win.',
   },
   {
     key: 'fresh',
@@ -241,7 +240,7 @@ export function MethodologyPanel() {
 
       <p className="text-xs text-gray-500 leading-relaxed">
         Der GEO Score (0–100) bewertet Ihre Website in 5 Dimensionen. Zusätzlich prüft der Lighthouse Agentic Browsing Check 
-        9 Audits für KI-Agenten-Readiness (Pass/Fail). Klicken Sie auf eine Dimension, um die genauen Prüfkriterien und Datenquellen zu sehen.
+        6 Audits für KI-Agenten-Readiness (Pass/Fail). Klicken Sie auf eine Dimension, um die genauen Prüfkriterien und Datenquellen zu sehen.
       </p>
 
       <div className="space-y-2">

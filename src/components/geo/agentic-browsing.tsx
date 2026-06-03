@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import {
   Loader2, CheckCircle2, XCircle, AlertCircle, MinusCircle,
   ChevronDown, ChevronUp, RefreshCw, ExternalLink, Shield,
-  FileText, Globe2, Bot, Code2, Map, BookOpen, Link2, Layers,
+  FileText, Globe2, Eye, Zap, Database, Code2,
 } from 'lucide-react'
 
 /* ─── Types ─── */
@@ -35,15 +35,12 @@ interface AgenticBrowsingData {
 /* ─── Audit icon mapping ─── */
 
 const AUDIT_ICONS: Record<string, React.ElementType> = {
-  'llms-txt-present': FileText,
-  'llms-txt-well-formed': FileText,
-  'agents-json-present': Bot,
-  'agents-json-actions-typed': Code2,
-  'sitemap-discoverable': Map,
-  'agent-runbook-present': BookOpen,
-  'auto-discovery-links': Link2,
-  'schema-org-density': Layers,
-  'webmcp-annotations': Globe2,
+  'llms-txt': FileText,
+  'webmcp-registered': Globe2,
+  'webmcp-forms': Database,
+  'webmcp-schema': Code2,
+  'agent-a11y': Eye,
+  'layout-stability': Zap,
 }
 
 /* ─── Helpers ─── */
@@ -115,7 +112,7 @@ function AuditRow({ audit, isExpanded, onToggle }: {
               ? 'text-red-600 bg-red-100'
               : 'text-gray-500 bg-gray-200'
         }`}>
-          {audit.passed === true ? 'Pass' : audit.passed === false ? 'Fail' : 'Skip'}
+          {audit.passed === true ? 'Pass' : audit.passed === false ? 'Fail' : 'N/A'}
         </span>
 
         {isExpanded ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
@@ -281,7 +278,7 @@ export function AgenticBrowsingCheck({ domain }: { domain: string }) {
               Lighthouse Agentic Browsing
             </h3>
             <p className="text-sm text-gray-500 mt-0.5">
-              9 Audits aus Chrome Lighthouse 13.3 für {domain}
+              6 Audits aus Chrome Lighthouse für {domain}
             </p>
           </div>
           <button
@@ -296,10 +293,10 @@ export function AgenticBrowsingCheck({ domain }: { domain: string }) {
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
           <Shield size={40} className="mx-auto text-gray-300 mb-3" />
           <p className="text-sm text-gray-500">
-            Prüft Ihre Website gegen die 9 Lighthouse Agentic Browsing Audits: llms.txt, agents.json, Sitemap, Agent-Runbook, Auto-Discovery-Links, Schema.org-Dichte und WebMCP.
+            Prüft Ihre Website gegen die 6 Lighthouse Agentic Browsing Audits: llms.txt, WebMCP-Tool-Registrierung, WebMCP-Formulare, WebMCP-Schema, Barrierefreiheit und Layout-Stabilität.
           </p>
           <p className="text-xs text-gray-400 mt-2">
-            Neu seit Mai 2026 in Chrome Lighthouse 13.3 · Dauert ca. 10–20 Sekunden
+            Chrome Lighthouse Agentic Browsing Scoring · Dauert ca. 10–15 Sekunden
           </p>
         </div>
 
@@ -323,7 +320,7 @@ export function AgenticBrowsingCheck({ domain }: { domain: string }) {
         <div className="bg-indigo-50 rounded-xl border border-indigo-200 p-8 text-center">
           <Loader2 size={32} className="mx-auto text-indigo-600 animate-spin mb-3" />
           <p className="text-sm font-medium text-indigo-800">Agentic Browsing Audit läuft…</p>
-          <p className="text-xs text-indigo-600 mt-1">Prüfe llms.txt, agents.json, Sitemap, Runbook & Discovery-Links</p>
+          <p className="text-xs text-indigo-600 mt-1">Prüfe llms.txt, WebMCP, Barrierefreiheit &amp; Layout-Stabilität</p>
         </div>
       </div>
     )
@@ -370,10 +367,10 @@ export function AgenticBrowsingCheck({ domain }: { domain: string }) {
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {passedAudits.length} bestanden · {failedAudits.length} fehlgeschlagen
-              {skippedAudits.length > 0 && ` · ${skippedAudits.length} übersprungen`}
+              {skippedAudits.length > 0 && ` · ${skippedAudits.length} nicht anwendbar`}
             </p>
             <p className="text-[11px] text-gray-400 mt-2">
-              Basierend auf Chrome Lighthouse 13.3 Agentic Browsing Scoring (Mai 2026).
+              Basierend auf Chrome Lighthouse Agentic Browsing Scoring.
               Pass/Fail pro Audit — kein gewichteter Score.
             </p>
           </div>
@@ -418,43 +415,43 @@ export function AgenticBrowsingCheck({ domain }: { domain: string }) {
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <p className="text-sm font-medium text-blue-800 mb-2">💡 Schnelle Verbesserungen</p>
           <ul className="space-y-1.5 text-xs text-blue-700">
-            {failedAudits.some(a => a.id === 'llms-txt-present') && (
+            {failedAudits.some(a => a.id === 'llms-txt') && (
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-0.5">•</span>
                 <span>
-                  <strong>llms.txt erstellen:</strong> LLM Radar generiert diese automatisch aus Ihrer Knowledge Base — nutzen Sie den Export.
+                  <strong>llms.txt erstellen:</strong> LLM Radar generiert diese Datei automatisch aus Ihrer Knowledge Base — nutzen Sie den Export und platzieren Sie sie unter <code className="bg-blue-100 px-1 rounded">/llms.txt</code>.
                 </span>
               </li>
             )}
-            {failedAudits.some(a => a.id === 'agents-json-present') && (
+            {failedAudits.some(a => a.id === 'webmcp-registered') && (
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-0.5">•</span>
                 <span>
-                  <strong>agents.json anlegen:</strong> Beschreibt Ihre Website-Fähigkeiten für KI-Agenten. Platzieren Sie die Datei unter <code className="bg-blue-100 px-1 rounded">/.well-known/agents.json</code>.
+                  <strong>WebMCP-Tools registrieren:</strong> Fügen Sie <code className="bg-blue-100 px-1 rounded">{'<template data-webmcp-tool="name">'}</code>-Elemente in Ihren HTML-Code ein, damit KI-Agenten mit Ihrer Website interagieren können.
                 </span>
               </li>
             )}
-            {failedAudits.some(a => a.id === 'agent-runbook-present') && (
+            {failedAudits.some(a => a.id === 'webmcp-forms') && (
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-0.5">•</span>
                 <span>
-                  <strong>Agent-Runbook erstellen:</strong> Eine Markdown-Datei unter <code className="bg-blue-100 px-1 rounded">/agent-instructions.md</code>, die Agenten erklärt, wie sie Ihre Website nutzen.
+                  <strong>Formulare annotieren:</strong> Jedes {'<form>'} sollte ein zugehöriges WebMCP-Template haben, das die Formular-Interaktion beschreibt.
                 </span>
               </li>
             )}
-            {failedAudits.some(a => a.id === 'auto-discovery-links') && (
+            {failedAudits.some(a => a.id === 'agent-a11y') && (
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-0.5">•</span>
                 <span>
-                  <strong>Discovery-Links hinzufügen:</strong> Fügen Sie <code className="bg-blue-100 px-1 rounded">{'<link rel="alternate" type="text/markdown" href="/llms.txt">'}</code> in Ihren HTML {'<head>'} ein.
+                  <strong>Accessibility verbessern:</strong> Nutzen Sie semantisches HTML (nav, main, header), ARIA-Rollen und Labels. Agenten navigieren über den Accessibility-Tree.
                 </span>
               </li>
             )}
-            {failedAudits.some(a => a.id === 'schema-org-density') && (
+            {failedAudits.some(a => a.id === 'layout-stability') && (
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-0.5">•</span>
                 <span>
-                  <strong>Schema.org erweitern:</strong> Mindestens 2 JSON-LD-Blöcke auf der Homepage (Organization + WebSite oder FAQPage).
+                  <strong>Layout stabilisieren:</strong> Setzen Sie width/height auf Bilder, nutzen Sie <code className="bg-blue-100 px-1 rounded">font-display: swap</code> und vermeiden Sie document.write().
                 </span>
               </li>
             )}

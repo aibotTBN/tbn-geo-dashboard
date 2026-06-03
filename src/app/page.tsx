@@ -484,7 +484,7 @@ export default function LandingPage() {
               {
                 icon: Bot,
                 title: 'Agentic Browsing Audit',
-                desc: 'Der neue Lighthouse-Standard (Mai 2026): 9 Checks prüfen, ob KI-Agenten Ihre Website autonom navigieren können — von llms.txt bis agents.json.',
+                desc: 'Der Lighthouse-Standard für KI-Agenten: 6 Audits prüfen llms.txt, WebMCP-Tool-Registrierung, Formular-Annotationen, Schema-Validität, Barrierefreiheit und Layout-Stabilität.',
                 color: 'bg-blue-600',
               },
             ].map((feature) => (
@@ -879,7 +879,7 @@ export default function LandingPage() {
             />
             <FAQItem
               question="Was ist der Agentic Browsing Audit?"
-              answer="Seit Mai 2026 enthält Chrome Lighthouse 13.3 neun neue Audits unter dem Namen ‚Agentic Browsing Scoring'. Diese prüfen, ob Ihre Website Dateien und Annotationen bereitstellt, die autonomen KI-Agenten die Navigation ermöglichen — z.B. llms.txt, agents.json, Agent-Runbooks und Schema.org-Dichte. LLM Radar führt alle 9 Checks automatisch durch und zeigt Ihnen, welche bestanden sind und wo Handlungsbedarf besteht. Da bisher weniger als 10% der Top-Domains diese Standards erfüllen, sichern Sie sich mit einer frühen Implementierung einen klaren Wettbewerbsvorteil."
+              answer="Chrome Lighthouse enthält unter ‚Agentic Browsing Scoring' sechs Audits, die prüfen, ob KI-Agenten Ihre Website nutzen können: llms.txt (maschinenlesbare Beschreibung), drei WebMCP-Checks (Tool-Registrierung, Formular-Annotationen, Schema-Validität), Barrierefreiheit für Agenten (Accessibility-Tree) und Layout-Stabilität (CLS). LLM Radar führt alle 6 Audits automatisch durch und zeigt, wo Handlungsbedarf besteht. Da bisher weniger als 10% der Top-Domains diese Standards erfüllen, sichern Sie sich mit einer frühen Implementierung einen klaren Wettbewerbsvorteil."
             />
             <FAQItem
               question="Kann ich LLM Radar kostenlos testen?"

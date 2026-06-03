@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Download, FileJson2, FileText, Copy, Check, Loader2,
   Code2, BookOpen, ChevronDown, ChevronUp, Globe2, Braces,
-  Bot, Link2, Shield,
+  Bot, Link2,
 } from 'lucide-react'
 
 interface Project {
@@ -37,8 +37,7 @@ export default function ExportPage() {
   const [mcpJson, setMcpJson] = useState('')
   const [schemaOrg, setSchemaOrg] = useState<SchemaOrgData | null>(null)
   const [skillsMd, setSkillsMd] = useState('')
-  const [agentsJson, setAgentsJson] = useState('')
-  const [agentRunbook, setAgentRunbook] = useState('')
+  const [agentCard, setAgentCard] = useState('')
   const [linkTags, setLinkTags] = useState('')
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
@@ -57,13 +56,12 @@ export default function ExportPage() {
   async function generateExports() {
     setLoading(true)
     try {
-      const [llmsRes, mcpRes, schemaRes, skillsRes, agentsRes, runbookRes, linkTagsRes] = await Promise.all([
+      const [llmsRes, mcpRes, schemaRes, skillsRes, agentCardRes, linkTagsRes] = await Promise.all([
         fetch(`/api/geo/export?domain=${selectedDomain}&format=llms.txt`),
         fetch(`/api/geo/export?domain=${selectedDomain}&format=mcp.json`),
         fetch(`/api/geo/export?domain=${selectedDomain}&format=schema.org`),
         fetch(`/api/geo/export?domain=${selectedDomain}&format=skills.md`),
-        fetch(`/api/geo/export?domain=${selectedDomain}&format=agents.json`),
-        fetch(`/api/geo/export?domain=${selectedDomain}&format=agent-runbook.md`),
+        fetch(`/api/geo/export?domain=${selectedDomain}&format=agent.json`),
         fetch(`/api/geo/export?domain=${selectedDomain}&format=link-tags`),
       ])
       setLlmsTxt(await llmsRes.text())
@@ -71,8 +69,7 @@ export default function ExportPage() {
       const schemaData = await schemaRes.json()
       setSchemaOrg(schemaData)
       setSkillsMd(await skillsRes.text())
-      setAgentsJson(JSON.stringify(await agentsRes.json(), null, 2))
-      setAgentRunbook(await runbookRes.text())
+      setAgentCard(JSON.stringify(await agentCardRes.json(), null, 2))
       setLinkTags(await linkTagsRes.text())
     } finally {
       setLoading(false)
@@ -350,41 +347,41 @@ export default function ExportPage() {
               </Card>
             </div>
 
-            {/* Agentic Browsing files — agents.json, agent-runbook.md, link-tags */}
+            {/* AI Agent Discovery — agent.json (A2A) + Discovery Links */}
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-2">
-                <Shield size={16} className="text-indigo-600" />
-                Lighthouse Agentic Browsing
+                <Bot size={16} className="text-indigo-600" />
+                AI Agent Discovery
               </h3>
               <p className="text-xs text-gray-400">
-                Dateien für den Chrome Lighthouse Agentic Browsing Audit (Mai 2026). Verbessern die Auffindbarkeit durch autonome KI-Agenten.
+                Standards für die Auffindbarkeit durch KI-Agenten: Google A2A Agent Card und HTML Discovery-Links.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* agents.json */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* agent.json (A2A) */}
               <Card className="border-indigo-200">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <div className="flex items-center gap-2">
                     <Bot size={18} className="text-indigo-600" />
-                    <CardTitle className="text-base">agents.json</CardTitle>
-                    <Badge variant="default" className="bg-indigo-600 text-xs">Neu</Badge>
+                    <CardTitle className="text-base">agent.json</CardTitle>
+                    <Badge variant="default" className="bg-indigo-600 text-xs">A2A</Badge>
                   </div>
                   <div className="flex gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={() => copyToClipboard(agentsJson, 'agents')}
+                      onClick={() => copyToClipboard(agentCard, 'agent')}
                       title="Kopieren"
                     >
-                      {copied === 'agents' ? <Check size={14} /> : <Copy size={14} />}
+                      {copied === 'agent' ? <Check size={14} /> : <Copy size={14} />}
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={() => downloadFile(agentsJson, 'agents.json', 'application/json')}
+                      onClick={() => downloadFile(agentCard, 'agent.json', 'application/json')}
                       title="Download"
                     >
                       <Download size={14} />
@@ -393,68 +390,19 @@ export default function ExportPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-xs text-gray-500 mb-2">
-                    Agent Capabilities &amp; Actions — Lighthouse-kompatibel, mit typisierten Parametern.
+                    Google A2A Agent Card — beschreibt Fähigkeiten und Endpunkte für KI-Agenten. Unter <code className="text-xs">/.well-known/agent.json</code> bereitstellen.
                   </p>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => toggleExpand('agents')}
+                    onClick={() => toggleExpand('agent')}
                     className="text-xs text-gray-500 px-0"
                   >
-                    {expandedCard === 'agents' ? 'Ausblenden' : 'Vorschau'}
+                    {expandedCard === 'agent' ? 'Ausblenden' : 'Vorschau'}
                   </Button>
-                  {expandedCard === 'agents' && (
+                  {expandedCard === 'agent' && (
                     <pre className="bg-gray-50 rounded-lg p-3 text-xs overflow-auto max-h-64 whitespace-pre-wrap font-mono mt-2">
-                      {agentsJson || 'Keine Daten'}
-                    </pre>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* agent-runbook.md */}
-              <Card className="border-indigo-200">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <div className="flex items-center gap-2">
-                    <BookOpen size={18} className="text-indigo-600" />
-                    <CardTitle className="text-base">agent-instructions.md</CardTitle>
-                    <Badge variant="default" className="bg-indigo-600 text-xs">Neu</Badge>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => copyToClipboard(agentRunbook, 'runbook')}
-                      title="Kopieren"
-                    >
-                      {copied === 'runbook' ? <Check size={14} /> : <Copy size={14} />}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => downloadFile(agentRunbook, 'agent-instructions.md', 'text/markdown')}
-                      title="Download"
-                    >
-                      <Download size={14} />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Anleitung für KI-Agenten: Wie sie die Website nutzen, Informationen finden und sich verhalten sollen.
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleExpand('runbook')}
-                    className="text-xs text-gray-500 px-0"
-                  >
-                    {expandedCard === 'runbook' ? 'Ausblenden' : 'Vorschau'}
-                  </Button>
-                  {expandedCard === 'runbook' && (
-                    <pre className="bg-gray-50 rounded-lg p-3 text-xs overflow-auto max-h-64 whitespace-pre-wrap font-mono mt-2">
-                      {agentRunbook || 'Keine Daten'}
+                      {agentCard || 'Keine Daten'}
                     </pre>
                   )}
                 </CardContent>
@@ -466,7 +414,6 @@ export default function ExportPage() {
                   <div className="flex items-center gap-2">
                     <Link2 size={18} className="text-indigo-600" />
                     <CardTitle className="text-base">Discovery Links</CardTitle>
-                    <Badge variant="default" className="bg-indigo-600 text-xs">Neu</Badge>
                   </div>
                   <div className="flex gap-1">
                     <Button
@@ -540,16 +487,15 @@ export default function ExportPage() {
                       <li><code>llms.txt</code> → <code>https://{selectedDomain}/llms.txt</code></li>
                       <li><code>mcp.json</code> → <code>https://{selectedDomain}/.well-known/mcp.json</code></li>
                       <li><code>skills.md</code> → <code>https://{selectedDomain}/.well-known/skills.md</code></li>
-                      <li><code>agents.json</code> → <code>https://{selectedDomain}/.well-known/agents.json</code></li>
-                      <li><code>agent-instructions.md</code> → <code>https://{selectedDomain}/agent-instructions.md</code></li>
+                      <li><code>agent.json</code> → <code>https://{selectedDomain}/.well-known/agent.json</code> (A2A)</li>
                       <li>Discovery <code>{'<link>'}</code>-Tags in den <code>{'<head>'}</code> einbetten</li>
                     </ol>
                   </div>
                 </div>
                 <p className="text-xs text-gray-400 mt-4">
                   Nach dem Deployment können Google AI Overviews die Schema.org-Daten nutzen,
-                  KI-Agenten finden die strukturierten Unternehmensdaten über MCP Discovery,
-                  und der Chrome Lighthouse Agentic Browsing Audit wird bestanden.
+                  KI-Agenten finden die strukturierten Unternehmensdaten über MCP Discovery und A2A Agent Card,
+                  und die llms.txt wird für den Chrome Lighthouse Agentic Browsing Audit erkannt.
                 </p>
               </CardContent>
             </Card>
