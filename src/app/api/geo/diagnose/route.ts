@@ -5,17 +5,43 @@ import { triggerDiagnose } from '@/lib/n8n'
 import { prisma } from '@/lib/prisma'
 
 /**
+ * Compute the citation dimension score (0-30) from per-engine data.
+ * Returns null if no usable engine data exists.
+ */
+function computeCitationFromEngines(citationEngines: Record<string, any>): number | null {
+  const activeEngines = Object.entries(citationEngines).filter(
+    ([, data]) => data && data.status === 'ok' && typeof data.score === 'number'
+  )
+  if (activeEngines.length === 0) return null
+  return Math.round(
+    activeEngines.reduce((sum, [, data]) => sum + (data.score ?? 0), 0) / activeEngines.length
+  )
+}
+
+/**
  * Normalize the n8n GEO Diagnose response into the flat format the frontend expects.
  * v2: Now includes per-engine citation data and Google AI Readiness.
+ * v3: Recomputes score_citation from per-engine data when available so the
+ *     top-level dimension always matches the engine breakdown average.
  */
 function normalizeResult(raw: any) {
   const report = raw?.report
   const scores = report?.scores
   const bd = scores?.breakdown
+  const citationEngines = report?.citation_engines ?? {}
+
+  // Prefer engine-derived citation score for consistency with the breakdown card
+  const rawCitation = bd?.citation?.score ?? 0
+  const engineCitation = computeCitationFromEngines(citationEngines)
+  const score_citation = engineCitation !== null ? engineCitation : rawCitation
+
+  // Recalculate total if citation was adjusted
+  const rawTotal = scores?.total ?? 0
+  const geo_score = rawTotal - rawCitation + score_citation
 
   return {
-    geo_score: scores?.total ?? 0,
-    score_citation: bd?.citation?.score ?? 0,
+    geo_score,
+    score_citation,
     score_tech: bd?.technical?.score ?? 0,
     score_schema: bd?.schema?.score ?? 0,
     score_content: bd?.content?.score ?? 0,
@@ -23,7 +49,7 @@ function normalizeResult(raw: any) {
     pages_analyzed: report?.analysis?.pages_crawled ?? report?.meta?.pages_analyzed ?? undefined,
     recommendations: report?.recommendations ?? [],
     // Multi-engine citation data
-    citation_engines: report?.citation_engines ?? {},
+    citation_engines: citationEngines,
     engines_active: bd?.citation?.engines_active ?? 1,
     // Google AI Readiness
     google_ai_readiness: report?.google_ai_readiness ?? null,

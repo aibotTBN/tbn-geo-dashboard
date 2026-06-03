@@ -97,6 +97,25 @@ function formatDuration(seconds: number): string {
   return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`
 }
 
+/**
+ * Recompute citation score from per-engine data so the dimension card
+ * always matches the engine breakdown average.
+ */
+function reconcileCitationScore(
+  diagnosis: { score: number; scoreCitation: number; [k: string]: any },
+  citationEngines: Record<string, any>
+): { score: number; scoreCitation: number } {
+  const activeEngines = Object.entries(citationEngines).filter(
+    ([, data]) => data && data.status === 'ok' && typeof data.score === 'number'
+  )
+  if (activeEngines.length === 0) return { score: diagnosis.score, scoreCitation: diagnosis.scoreCitation }
+  const avgScore = Math.round(
+    activeEngines.reduce((sum, [, data]) => sum + (data.score ?? 0), 0) / activeEngines.length
+  )
+  const adjustedTotal = diagnosis.score - diagnosis.scoreCitation + avgScore
+  return { score: adjustedTotal, scoreCitation: avgScore }
+}
+
 const PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function ProjectDetailPage() {
@@ -166,7 +185,8 @@ export default function ProjectDetailPage() {
               googleAiReadiness = report?.google_ai_readiness || null
             } catch (e) { /* ignore */ }
           }
-          setDiagnosis({ ...d, citationEngines, enginesActive, googleAiReadiness })
+          const reconciled = reconcileCitationScore(d, citationEngines)
+          setDiagnosis({ ...d, ...reconciled, citationEngines, enginesActive, googleAiReadiness })
           setReportJsonRaw(d.reportJson || null)
           setProject(proj)
           setAwaitingDiagnosis(false)
@@ -216,7 +236,8 @@ export default function ProjectDetailPage() {
               googleAiReadiness = report?.google_ai_readiness || null
             } catch (e) { /* ignore parse errors */ }
           }
-          setDiagnosis({ ...d, citationEngines, enginesActive, googleAiReadiness })
+          const reconciled = reconcileCitationScore(d, citationEngines)
+          setDiagnosis({ ...d, ...reconciled, citationEngines, enginesActive, googleAiReadiness })
           setReportJsonRaw(d.reportJson || null)
         }
 
