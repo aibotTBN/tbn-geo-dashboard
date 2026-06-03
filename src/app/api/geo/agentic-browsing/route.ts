@@ -4,22 +4,21 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 /**
- * Agentic Browsing Audit API — maps to Lighthouse 13.3 "Agentic Browsing" audits.
- * Runs independently (like Google Readiness Check), no n8n dependency.
+ * Agentic Browsing Audit API — maps to the 6 real Chrome Lighthouse
+ * "Agentic Browsing" audits (Lighthouse ≥ 13.3, May 2026).
+ *
+ * Spec: https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring
  *
  * GET /api/geo/agentic-browsing?domain=example.com          — run fresh audit & save
  * GET /api/geo/agentic-browsing?domain=example.com&load=1   — load last saved result
  *
- * Returns pass/fail for each of the 9 Lighthouse Agentic Browsing audits:
- *   1. llms-txt-present
- *   2. llms-txt-well-formed
- *   3. agents-json-present
- *   4. agents-json-actions-typed
- *   5. sitemap-discoverable
- *   6. agent-runbook-present
- *   7. auto-discovery-links
- *   8. schema-org-density
- *   9. webmcp-annotations (placeholder — spec not final)
+ * The 6 real Lighthouse Agentic Browsing audits:
+ *   1. llms-txt           — Machine-readable summary at domain root
+ *   2. webmcp-registered  — Registered WebMCP tools (declarative or imperative)
+ *   3. webmcp-forms       — Forms should have declarative WebMCP annotations
+ *   4. webmcp-schema      — WebMCP schema validity
+ *   5. agent-a11y         — Accessibility tree for machine interaction
+ *   6. layout-stability   — CLS for reliable agent interaction
  */
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; LLMRadar/1.0; +https://llmradar.de)'
@@ -47,6 +46,14 @@ async function safeFetchText(url: string): Promise<{ ok: boolean; status: number
   return { ok: resp.ok, status: resp.status, text }
 }
 
+async function safeFetchHtml(domain: string): Promise<string> {
+  const resp = await safeFetch(`https://${domain}`, {
+    headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' },
+  })
+  if (!resp?.ok) return ''
+  return await resp.text().catch(() => '')
+}
+
 /* ─── Audit result type ─── */
 
 interface AuditResult {
@@ -58,434 +65,493 @@ interface AuditResult {
   learnMoreUrl?: string
 }
 
-/* ─── Audit 1: llms-txt-present ─── */
+/* ═══════════════════════════════════════════════════════════════
+   Audit 1: llms.txt — Machine-readable summary
+   Real Lighthouse audit: "llms.txt"
+   Spec: https://llmstxt.org/
+   ═══════════════════════════════════════════════════════════════ */
 
-async function auditLlmsTxtPresent(domain: string): Promise<{ audit: AuditResult; body: string }> {
+async function auditLlmsTxt(domain: string): Promise<AuditResult> {
   const url = `https://${domain}/llms.txt`
   const { ok, status, text } = await safeFetchText(url)
 
-  return {
-    body: ok ? text : '',
-    audit: {
-      id: 'llms-txt-present',
-      title: 'llms.txt vorhanden',
-      description: 'Prüft, ob unter /{domain}/llms.txt eine maschinenlesbare Beschreibung für LLMs erreichbar ist.',
-      passed: ok && text.trim().length > 0,
-      details: ok
-        ? `llms.txt gefunden (${text.length} Zeichen)`
-        : status > 0
-          ? `HTTP ${status} — llms.txt nicht erreichbar`
-          : 'Verbindung fehlgeschlagen',
-      learnMoreUrl: 'https://llmstxt.org/',
-    },
-  }
-}
-
-/* ─── Audit 2: llms-txt-well-formed ─── */
-
-function auditLlmsTxtWellFormed(body: string, present: boolean): AuditResult {
-  if (!present || !body) {
+  if (!ok || !text.trim()) {
     return {
-      id: 'llms-txt-well-formed',
-      title: 'llms.txt wohlgeformt',
-      description: 'Prüft, ob die llms.txt der Spezifikation (llmstxt.org) entspricht: Markdown-Struktur mit # Titel, ## Abschnitten und optionalen Links.',
+      id: 'llms-txt',
+      title: 'llms.txt vorhanden',
+      description:
+        'Prüft, ob unter /{domain}/llms.txt eine maschinenlesbare Beschreibung existiert. ' +
+        'Lighthouse erwartet eine Markdown-Datei mit mindestens einem # Titel und beschreibendem Inhalt.',
       passed: false,
-      details: 'Übersprungen — llms.txt nicht vorhanden',
+      details: status > 0
+        ? `HTTP ${status} — llms.txt nicht erreichbar`
+        : 'Verbindung fehlgeschlagen — llms.txt nicht gefunden',
+      learnMoreUrl: 'https://llmstxt.org/',
     }
   }
 
+  // Validate structure per llmstxt.org spec
+  const lines = text.split('\n')
+  const firstContentLine = lines.find((l) => l.trim().length > 0)
+  const hasTitle = firstContentLine?.startsWith('# ') ?? false
+  const h2Count = lines.filter((l) => /^## /.test(l)).length
+  const hasBlockquote = lines.some((l) => l.trim().startsWith('>'))
+  const linkCount = (text.match(/\[([^\]]+)\]\(([^)]+)\)/g) || []).length
+
   const issues: string[] = []
-  const lines = body.split('\n')
+  if (!hasTitle) issues.push('Keine # Überschrift am Anfang')
+  if (h2Count === 0) issues.push('Keine ## Abschnitte gefunden')
+  if (text.trim().length < 100) issues.push(`Sehr kurz (${text.trim().length} Zeichen)`)
 
-  // Must start with a # heading
-  const firstContentLine = lines.find(l => l.trim().length > 0)
-  if (!firstContentLine || !firstContentLine.startsWith('# ')) {
-    issues.push('Muss mit einer # Überschrift beginnen')
-  }
-
-  // Should have at least one ## section
-  const h2Count = lines.filter(l => /^## /.test(l)).length
-  if (h2Count === 0) {
-    issues.push('Mindestens ein ## Abschnitt erwartet')
-  }
-
-  // Should have reasonable length (at least 100 chars)
-  if (body.trim().length < 100) {
-    issues.push(`Sehr kurz (${body.trim().length} Zeichen) — sollte mindestens 100 Zeichen sein`)
-  }
-
-  // Check for markdown links (optional but recommended)
-  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g
-  const links = body.match(linkPattern)
-
-  // Check for description after title (spec: "blockquote with short description")
-  const hasBlockquote = lines.some(l => l.trim().startsWith('>'))
-
-  const passed = issues.length === 0
+  const passed = hasTitle && h2Count > 0 && text.trim().length >= 100
 
   let details = passed
-    ? `Wohlgeformt: ${h2Count} Abschnitte`
-    : `Probleme: ${issues.join('; ')}`
+    ? `llms.txt vorhanden (${text.length} Zeichen, ${h2Count} Abschnitte`
+    : `llms.txt gefunden, aber nicht spec-konform: ${issues.join('; ')}`
 
-  if (links) details += ` · ${links.length} Links`
-  if (hasBlockquote) details += ' · Beschreibung vorhanden'
+  if (linkCount > 0) details += `, ${linkCount} Links`
+  if (hasBlockquote) details += ', Beschreibung vorhanden'
+  if (passed) details += ')'
 
   return {
-    id: 'llms-txt-well-formed',
-    title: 'llms.txt wohlgeformt',
-    description: 'Prüft, ob die llms.txt der Spezifikation (llmstxt.org) entspricht: Markdown-Struktur mit # Titel, ## Abschnitten und optionalen Links.',
+    id: 'llms-txt',
+    title: 'llms.txt vorhanden',
+    description:
+      'Prüft, ob unter /{domain}/llms.txt eine maschinenlesbare Beschreibung existiert. ' +
+      'Lighthouse erwartet eine Markdown-Datei mit mindestens einem # Titel und beschreibendem Inhalt.',
     passed,
     details,
     learnMoreUrl: 'https://llmstxt.org/',
   }
 }
 
-/* ─── Audit 3: agents-json-present ─── */
+/* ═══════════════════════════════════════════════════════════════
+   Audit 2: Registered WebMCP tools
+   Real Lighthouse audit: "Registered WebMCP tools"
+   Checks for declarative (<template data-webmcp-tool>) or
+   imperative (navigator.ai.registerTool) WebMCP registrations.
+   ═══════════════════════════════════════════════════════════════ */
 
-async function auditAgentsJsonPresent(domain: string): Promise<{ audit: AuditResult; parsed: any | null }> {
-  // Try both /.well-known/agents.json and /agents.json
-  const urls = [
-    `https://${domain}/.well-known/agents.json`,
-    `https://${domain}/agents.json`,
-  ]
-
-  for (const url of urls) {
-    const { ok, text } = await safeFetchText(url)
-    if (ok && text.trim()) {
-      try {
-        const parsed = JSON.parse(text)
-        return {
-          parsed,
-          audit: {
-            id: 'agents-json-present',
-            title: 'agents.json vorhanden',
-            description: 'Prüft, ob eine agents.json-Datei erreichbar ist, die den Agenten Fähigkeiten und Endpunkte der Website beschreibt.',
-            passed: true,
-            details: `agents.json gefunden unter ${url.replace(`https://${domain}`, '')}`,
-            learnMoreUrl: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring',
-          },
-        }
-      } catch {
-        return {
-          parsed: null,
-          audit: {
-            id: 'agents-json-present',
-            title: 'agents.json vorhanden',
-            description: 'Prüft, ob eine agents.json-Datei erreichbar ist, die den Agenten Fähigkeiten und Endpunkte der Website beschreibt.',
-            passed: false,
-            details: `agents.json gefunden, aber kein valides JSON`,
-          },
-        }
-      }
-    }
-  }
-
-  return {
-    parsed: null,
-    audit: {
-      id: 'agents-json-present',
-      title: 'agents.json vorhanden',
-      description: 'Prüft, ob eine agents.json-Datei erreichbar ist, die den Agenten Fähigkeiten und Endpunkte der Website beschreibt.',
-      passed: false,
-      details: 'agents.json nicht gefunden (weder unter /.well-known/agents.json noch /agents.json)',
-      learnMoreUrl: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring',
-    },
-  }
-}
-
-/* ─── Audit 4: agents-json-actions-typed ─── */
-
-function auditAgentsJsonActionsTyped(parsed: any | null): AuditResult {
-  if (!parsed) {
+function auditWebMcpRegistered(html: string): AuditResult {
+  if (!html) {
     return {
-      id: 'agents-json-actions-typed',
-      title: 'agents.json Actions typisiert',
-      description: 'Prüft, ob alle Actions in der agents.json typisierte Parameter mit Typ-Annotationen haben.',
+      id: 'webmcp-registered',
+      title: 'Registrierte WebMCP-Tools',
+      description:
+        'Prüft, ob die Website WebMCP-Tools registriert hat — entweder deklarativ via ' +
+        '<template data-webmcp-tool> oder imperativ via navigator.ai.registerTool().',
       passed: false,
-      details: 'Übersprungen — agents.json nicht vorhanden oder nicht parsbar',
+      details: 'Website nicht erreichbar — konnte nicht auf WebMCP-Tools prüfen',
+      learnMoreUrl: 'https://AminFazl.github.io/WebMCP/',
     }
   }
 
-  const actions = parsed.actions || parsed.capabilities?.actions || []
-  if (!Array.isArray(actions) || actions.length === 0) {
-    return {
-      id: 'agents-json-actions-typed',
-      title: 'agents.json Actions typisiert',
-      description: 'Prüft, ob alle Actions in der agents.json typisierte Parameter mit Typ-Annotationen haben.',
-      passed: false,
-      details: 'Keine Actions in agents.json definiert',
-    }
-  }
+  // Check for declarative WebMCP: <template data-webmcp-tool="...">
+  const declarativePattern = /data-webmcp-tool/gi
+  const declarativeMatches = html.match(declarativePattern) || []
 
-  let totalParams = 0
-  let typedParams = 0
-  const untypedActions: string[] = []
+  // Check for imperative WebMCP: navigator.ai.registerTool
+  const imperativePattern = /navigator\.ai\.registerTool/gi
+  const imperativeMatches = html.match(imperativePattern) || []
 
-  for (const action of actions) {
-    const params = action.parameters || action.inputs || action.params || []
-    if (Array.isArray(params)) {
-      for (const param of params) {
-        totalParams++
-        if (param.type || param.schema?.type) {
-          typedParams++
-        }
-      }
-      const hasUntyped = params.some((p: any) => !p.type && !p.schema?.type)
-      if (hasUntyped) {
-        untypedActions.push(action.name || action.id || 'unnamed')
-      }
-    }
-    // Also check if action itself has inputSchema (JSON Schema style)
-    if (action.inputSchema?.properties) {
-      const props = action.inputSchema.properties
-      for (const key of Object.keys(props)) {
-        totalParams++
-        if (props[key].type) typedParams++
-      }
-    }
-  }
+  // Also check for WebMCP meta tags or link references
+  const webmcpMeta = /webmcp/gi
+  const webmcpRefs = html.match(webmcpMeta) || []
 
-  const passed = totalParams > 0 && typedParams === totalParams
+  const declarativeCount = declarativeMatches.length
+  const imperativeCount = imperativeMatches.length
+  const totalTools = declarativeCount + imperativeCount
 
-  return {
-    id: 'agents-json-actions-typed',
-    title: 'agents.json Actions typisiert',
-    description: 'Prüft, ob alle Actions in der agents.json typisierte Parameter mit Typ-Annotationen haben.',
-    passed,
-    details: passed
-      ? `${actions.length} Actions, alle ${totalParams} Parameter typisiert`
-      : totalParams === 0
-        ? `${actions.length} Actions gefunden, aber keine typisierten Parameter`
-        : `${typedParams}/${totalParams} Parameter typisiert — fehlend bei: ${untypedActions.join(', ')}`,
-  }
-}
+  const passed = totalTools > 0
 
-/* ─── Audit 5: sitemap-discoverable ─── */
-
-async function auditSitemapDiscoverable(domain: string): Promise<AuditResult> {
-  // Check 1: /sitemap.xml exists
-  const sitemapResp = await safeFetch(`https://${domain}/sitemap.xml`)
-  const sitemapExists = sitemapResp?.ok ?? false
-
-  // Also try /sitemap_index.xml
-  let sitemapIndexExists = false
-  if (!sitemapExists) {
-    const indexResp = await safeFetch(`https://${domain}/sitemap_index.xml`)
-    sitemapIndexExists = indexResp?.ok ?? false
-  }
-
-  // Check 2: Sitemap referenced in robots.txt
-  const { ok: robotsOk, text: robotsText } = await safeFetchText(`https://${domain}/robots.txt`)
-  const sitemapInRobots = robotsOk && /sitemap\s*:/i.test(robotsText)
-
-  const hasSitemap = sitemapExists || sitemapIndexExists
-  const passed = hasSitemap && sitemapInRobots
-
-  let details = ''
-  if (!hasSitemap) {
-    details = 'Sitemap nicht gefunden (/sitemap.xml und /sitemap_index.xml)'
-  } else if (!sitemapInRobots) {
-    details = `Sitemap vorhanden, aber nicht in robots.txt referenziert (Sitemap: ... fehlt)`
+  let details: string
+  if (passed) {
+    const parts: string[] = []
+    if (declarativeCount > 0) parts.push(`${declarativeCount} deklarativ (data-webmcp-tool)`)
+    if (imperativeCount > 0) parts.push(`${imperativeCount} imperativ (navigator.ai.registerTool)`)
+    details = `${totalTools} WebMCP-Tool(s) registriert: ${parts.join(', ')}`
   } else {
-    details = 'Sitemap vorhanden und in robots.txt referenziert'
+    details = webmcpRefs.length > 0
+      ? 'WebMCP-Referenzen im HTML gefunden, aber keine Tool-Registrierungen. Nutzen Sie <template data-webmcp-tool="name"> für deklarative Tools.'
+      : 'Keine WebMCP-Tool-Registrierungen gefunden. Lighthouse erwartet mindestens ein Tool via <template data-webmcp-tool> oder navigator.ai.registerTool().'
   }
 
   return {
-    id: 'sitemap-discoverable',
-    title: 'Sitemap auffindbar',
-    description: 'Prüft, ob eine XML-Sitemap existiert UND in der robots.txt via "Sitemap:"-Direktive referenziert wird.',
+    id: 'webmcp-registered',
+    title: 'Registrierte WebMCP-Tools',
+    description:
+      'Prüft, ob die Website WebMCP-Tools registriert hat — entweder deklarativ via ' +
+      '<template data-webmcp-tool> oder imperativ via navigator.ai.registerTool().',
     passed,
     details,
+    learnMoreUrl: 'https://AminFazl.github.io/WebMCP/',
   }
 }
 
-/* ─── Audit 6: agent-runbook-present ─── */
+/* ═══════════════════════════════════════════════════════════════
+   Audit 3: Forms missing declarative WebMCP
+   Real Lighthouse audit: "Forms missing declarative WebMCP"
+   Checks if <form> elements have WebMCP annotations.
+   ═══════════════════════════════════════════════════════════════ */
 
-async function auditAgentRunbookPresent(domain: string): Promise<AuditResult> {
-  // Check common paths for agent instructions / runbook
-  const paths = [
-    '/agent-instructions.md',
-    '/.well-known/agent-instructions.md',
-    '/agent-runbook.md',
-    '/.well-known/agent-runbook.md',
-  ]
-
-  for (const path of paths) {
-    const { ok, text } = await safeFetchText(`https://${domain}${path}`)
-    if (ok && text.trim().length > 50) {
-      return {
-        id: 'agent-runbook-present',
-        title: 'Agent-Runbook vorhanden',
-        description: 'Prüft, ob eine agent-instructions.md oder agent-runbook.md existiert, die Agenten erklärt, wie sie mit der Website interagieren sollen.',
-        passed: true,
-        details: `Runbook gefunden unter ${path} (${text.length} Zeichen)`,
-        learnMoreUrl: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring',
-      }
+function auditWebMcpForms(html: string): AuditResult {
+  if (!html) {
+    return {
+      id: 'webmcp-forms',
+      title: 'Formulare mit WebMCP-Annotationen',
+      description:
+        'Prüft, ob alle <form>-Elemente auf der Seite deklarative WebMCP-Annotationen haben, ' +
+        'damit KI-Agenten Formulare verstehen und ausfüllen können.',
+      passed: null,
+      details: 'Website nicht erreichbar — konnte nicht auf Formulare prüfen',
     }
   }
 
+  // Count forms
+  const formPattern = /<form[\s>]/gi
+  const forms = html.match(formPattern) || []
+  const formCount = forms.length
+
+  if (formCount === 0) {
+    return {
+      id: 'webmcp-forms',
+      title: 'Formulare mit WebMCP-Annotationen',
+      description:
+        'Prüft, ob alle <form>-Elemente auf der Seite deklarative WebMCP-Annotationen haben, ' +
+        'damit KI-Agenten Formulare verstehen und ausfüllen können.',
+      passed: null, // No forms = N/A
+      details: 'Keine Formulare auf der Seite gefunden — Audit nicht anwendbar.',
+    }
+  }
+
+  // Check if forms have WebMCP annotations nearby
+  // Look for data-webmcp-tool attributes near/inside form elements
+  const formWebMcpPattern = /<form[^>]*data-webmcp|data-webmcp-tool[^>]*>[\s\S]*?<form|<template[^>]*data-webmcp-tool[\s\S]*?<\/template>[\s]*<form/gi
+  const annotatedForms = html.match(formWebMcpPattern) || []
+
+  // Simpler check: count templates with data-webmcp-tool that seem form-related
+  const webmcpTemplates = (html.match(/<template[^>]*data-webmcp-tool/gi) || []).length
+
+  // If we have at least as many WebMCP templates as forms, likely covered
+  const passed = webmcpTemplates >= formCount || annotatedForms.length > 0
+
   return {
-    id: 'agent-runbook-present',
-    title: 'Agent-Runbook vorhanden',
-    description: 'Prüft, ob eine agent-instructions.md oder agent-runbook.md existiert, die Agenten erklärt, wie sie mit der Website interagieren sollen.',
-    passed: false,
-    details: 'Kein Agent-Runbook gefunden (agent-instructions.md / agent-runbook.md)',
+    id: 'webmcp-forms',
+    title: 'Formulare mit WebMCP-Annotationen',
+    description:
+      'Prüft, ob alle <form>-Elemente auf der Seite deklarative WebMCP-Annotationen haben, ' +
+      'damit KI-Agenten Formulare verstehen und ausfüllen können.',
+    passed,
+    details: passed
+      ? `${formCount} Formular(e) gefunden, WebMCP-Annotationen vorhanden.`
+      : `${formCount} Formular(e) gefunden, aber keine deklarativen WebMCP-Annotationen (<template data-webmcp-tool>). ` +
+        `Agenten können diese Formulare nicht automatisch ausfüllen.`,
+    learnMoreUrl: 'https://AminFazl.github.io/WebMCP/',
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Audit 4: WebMCP schema validity
+   Real Lighthouse audit: "WebMCP schema validity"
+   Validates the structure of WebMCP tool declarations.
+   ═══════════════════════════════════════════════════════════════ */
+
+function auditWebMcpSchema(html: string): AuditResult {
+  if (!html) {
+    return {
+      id: 'webmcp-schema',
+      title: 'WebMCP-Schema gültig',
+      description:
+        'Prüft, ob die deklarierten WebMCP-Tools eine gültige Schema-Struktur haben ' +
+        '(korrekte Attribute, Typ-Annotationen, beschreibende Inhalte).',
+      passed: null,
+      details: 'Website nicht erreichbar',
+    }
+  }
+
+  // Extract all WebMCP template declarations
+  const templatePattern = /<template[^>]*data-webmcp-tool[^>]*>[\s\S]*?<\/template>/gi
+  const templates = html.match(templatePattern) || []
+
+  if (templates.length === 0) {
+    // Check if imperative tools exist (we can't validate schema for those from HTML alone)
+    const hasImperative = /navigator\.ai\.registerTool/i.test(html)
+    if (hasImperative) {
+      return {
+        id: 'webmcp-schema',
+        title: 'WebMCP-Schema gültig',
+        description:
+          'Prüft, ob die deklarierten WebMCP-Tools eine gültige Schema-Struktur haben ' +
+          '(korrekte Attribute, Typ-Annotationen, beschreibende Inhalte).',
+        passed: null,
+        details: 'Nur imperative WebMCP-Tools gefunden — Schema-Validierung erfordert deklarative Templates.',
+      }
+    }
+
+    return {
+      id: 'webmcp-schema',
+      title: 'WebMCP-Schema gültig',
+      description:
+        'Prüft, ob die deklarierten WebMCP-Tools eine gültige Schema-Struktur haben ' +
+        '(korrekte Attribute, Typ-Annotationen, beschreibende Inhalte).',
+      passed: null,
+      details: 'Keine WebMCP-Tool-Deklarationen gefunden — Audit nicht anwendbar.',
+    }
+  }
+
+  // Validate each template
+  const issues: string[] = []
+  let validCount = 0
+
+  for (const tpl of templates) {
+    // Check required attribute: data-webmcp-tool="name"
+    const nameMatch = tpl.match(/data-webmcp-tool=["']([^"']+)["']/i)
+    if (!nameMatch || !nameMatch[1].trim()) {
+      issues.push('Tool ohne Namen (data-webmcp-tool ist leer)')
+      continue
+    }
+
+    const toolName = nameMatch[1]
+
+    // Check for description attribute
+    const hasDescription = /data-webmcp-description/i.test(tpl)
+    if (!hasDescription) {
+      issues.push(`"${toolName}": Keine Beschreibung (data-webmcp-description fehlt)`)
+    }
+
+    // Check for input/param definitions (should have data-webmcp-param or similar)
+    const hasParams = /data-webmcp-param|data-webmcp-input|<input|<select|<textarea/i.test(tpl)
+
+    if (hasDescription || hasParams) {
+      validCount++
+    }
+  }
+
+  const passed = issues.length === 0 && validCount === templates.length
+
+  return {
+    id: 'webmcp-schema',
+    title: 'WebMCP-Schema gültig',
+    description:
+      'Prüft, ob die deklarierten WebMCP-Tools eine gültige Schema-Struktur haben ' +
+      '(korrekte Attribute, Typ-Annotationen, beschreibende Inhalte).',
+    passed,
+    details: passed
+      ? `${templates.length} WebMCP-Template(s) mit gültigem Schema.`
+      : issues.length > 0
+        ? `Schema-Probleme: ${issues.join('; ')}`
+        : `${validCount}/${templates.length} Templates validiert.`,
+    learnMoreUrl: 'https://AminFazl.github.io/WebMCP/',
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Audit 5: Accessibility for agents
+   Real Lighthouse audit: "Accessibility for agents"
+   Checks for a usable accessibility tree (ARIA roles, labels,
+   semantic HTML) that enables machine interaction.
+   ═══════════════════════════════════════════════════════════════ */
+
+function auditAgentAccessibility(html: string): AuditResult {
+  if (!html) {
+    return {
+      id: 'agent-a11y',
+      title: 'Barrierefreiheit für Agenten',
+      description:
+        'Prüft, ob die Seite einen nutzbaren Accessibility-Tree bereitstellt: ARIA-Rollen, ' +
+        'Labels, semantisches HTML. Agenten navigieren Websites über den A11y-Tree, nicht visuell.',
+      passed: false,
+      details: 'Website nicht erreichbar',
+      learnMoreUrl: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring',
+    }
+  }
+
+  // Score based on accessibility best practices relevant to agents
+  let score = 0
+  const maxScore = 10
+  const findings: string[] = []
+  const issues: string[] = []
+
+  // 1. Semantic landmarks (nav, main, header, footer, aside, section)
+  const landmarks = ['<nav', '<main', '<header', '<footer', '<aside', '<section']
+  const foundLandmarks = landmarks.filter((l) => html.toLowerCase().includes(l))
+  if (foundLandmarks.length >= 3) {
+    score += 2
+    findings.push(`${foundLandmarks.length} semantische Landmarks`)
+  } else {
+    issues.push(`Nur ${foundLandmarks.length} Landmarks (mind. 3 empfohlen: nav, main, header/footer)`)
+  }
+
+  // 2. ARIA roles
+  const ariaRoles = (html.match(/role=["'][^"']+["']/gi) || []).length
+  if (ariaRoles >= 3) {
+    score += 2
+    findings.push(`${ariaRoles} ARIA-Roles`)
+  } else if (ariaRoles > 0) {
+    score += 1
+    issues.push(`Nur ${ariaRoles} ARIA-Roles (mind. 3 empfohlen)`)
+  } else {
+    issues.push('Keine ARIA-Roles gefunden')
+  }
+
+  // 3. ARIA labels (aria-label, aria-labelledby, aria-describedby)
+  const ariaLabels = (html.match(/aria-label(?:ledby|edby)?=["'][^"']+["']/gi) || []).length
+  if (ariaLabels >= 5) {
+    score += 2
+    findings.push(`${ariaLabels} ARIA-Labels`)
+  } else if (ariaLabels > 0) {
+    score += 1
+    issues.push(`Nur ${ariaLabels} ARIA-Labels (mind. 5 empfohlen)`)
+  } else {
+    issues.push('Keine ARIA-Labels gefunden')
+  }
+
+  // 4. Heading hierarchy (h1, h2, h3)
+  const h1Count = (html.match(/<h1[\s>]/gi) || []).length
+  const h2Count = (html.match(/<h2[\s>]/gi) || []).length
+  const h3Count = (html.match(/<h3[\s>]/gi) || []).length
+  if (h1Count >= 1 && h2Count >= 1) {
+    score += 2
+    findings.push(`Heading-Hierarchie: ${h1Count}×h1, ${h2Count}×h2, ${h3Count}×h3`)
+  } else {
+    issues.push('Unvollständige Heading-Hierarchie')
+  }
+
+  // 5. Form labels — buttons/inputs with labels or aria-label
+  const inputs = (html.match(/<input[\s>]/gi) || []).length
+  const buttons = (html.match(/<button[\s>]/gi) || []).length
+  const labels = (html.match(/<label[\s>]/gi) || []).length
+  if (inputs + buttons > 0) {
+    if (labels >= inputs || ariaLabels > inputs) {
+      score += 2
+      findings.push(`${inputs} Inputs, ${labels} Labels, ${buttons} Buttons — gut beschriftet`)
+    } else {
+      score += 1
+      issues.push(`${inputs} Inputs, aber nur ${labels} Labels — einige nicht beschriftet`)
+    }
+  } else {
+    score += 2 // No interactive elements = no issue
+    findings.push('Keine unbeschrifteten interaktiven Elemente')
+  }
+
+  // Threshold: 7/10 = pass
+  const passed = score >= 7
+
+  const detailParts: string[] = []
+  if (findings.length > 0) detailParts.push(findings.join(' · '))
+  if (issues.length > 0) detailParts.push(`Verbesserungsbedarf: ${issues.join('; ')}`)
+  detailParts.push(`Score: ${score}/${maxScore}`)
+
+  return {
+    id: 'agent-a11y',
+    title: 'Barrierefreiheit für Agenten',
+    description:
+      'Prüft, ob die Seite einen nutzbaren Accessibility-Tree bereitstellt: ARIA-Rollen, ' +
+      'Labels, semantisches HTML. Agenten navigieren Websites über den A11y-Tree, nicht visuell.',
+    passed,
+    details: detailParts.join(' — '),
     learnMoreUrl: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring',
   }
 }
 
-/* ─── Audit 7: auto-discovery-links ─── */
+/* ═══════════════════════════════════════════════════════════════
+   Audit 6: Layout stability (CLS)
+   Real Lighthouse audit: "Layout stability"
+   Checks for layout shift indicators in the HTML — inline sizes,
+   aspect ratios, font-display, no layout-shifting patterns.
+   ═══════════════════════════════════════════════════════════════ */
 
-async function auditAutoDiscoveryLinks(domain: string): Promise<AuditResult> {
-  const resp = await safeFetch(`https://${domain}`, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      Accept: 'text/html',
-    },
-  })
-
-  if (!resp || !resp.ok) {
+function auditLayoutStability(html: string): AuditResult {
+  if (!html) {
     return {
-      id: 'auto-discovery-links',
-      title: 'Auto-Discovery Links im <head>',
-      description: 'Prüft, ob <link>-Tags im HTML <head> auf maschinenlesbare Ressourcen verweisen (llms.txt, agents.json, Sitemap etc.).',
+      id: 'layout-stability',
+      title: 'Layout-Stabilität (CLS)',
+      description:
+        'Prüft Indikatoren für stabile Layouts: Bilder mit width/height, font-display:swap, ' +
+        'keine bekannten CLS-verursachenden Patterns. Agenten brauchen stabile Layouts für zuverlässige Interaktion.',
       passed: false,
       details: 'Website nicht erreichbar',
+      learnMoreUrl: 'https://web.dev/articles/cls',
     }
   }
 
-  const html = await resp.text().catch(() => '')
+  let score = 0
+  const maxScore = 8
+  const findings: string[] = []
+  const issues: string[] = []
 
-  // Extract <head> section
-  const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i)
-  if (!headMatch) {
-    return {
-      id: 'auto-discovery-links',
-      title: 'Auto-Discovery Links im <head>',
-      description: 'Prüft, ob <link>-Tags im HTML <head> auf maschinenlesbare Ressourcen verweisen (llms.txt, agents.json, Sitemap etc.).',
-      passed: false,
-      details: 'Kein <head>-Bereich im HTML gefunden',
+  // 1. Images with explicit width/height attributes (prevents CLS)
+  const imgTags = html.match(/<img[^>]*>/gi) || []
+  const imgCount = imgTags.length
+  if (imgCount > 0) {
+    const imgWithDimensions = imgTags.filter(
+      (img) => /width\s*=/.test(img) && /height\s*=/.test(img)
+    ).length
+    const ratio = imgCount > 0 ? imgWithDimensions / imgCount : 1
+    if (ratio >= 0.8) {
+      score += 3
+      findings.push(`${imgWithDimensions}/${imgCount} Bilder mit Dimensionen`)
+    } else if (ratio >= 0.5) {
+      score += 1
+      issues.push(`Nur ${imgWithDimensions}/${imgCount} Bilder mit width/height`)
+    } else {
+      issues.push(`${imgCount - imgWithDimensions}/${imgCount} Bilder ohne Dimensionen — CLS-Risiko`)
     }
+  } else {
+    score += 3 // No images = no CLS from images
+    findings.push('Keine Bilder ohne Dimensionen')
   }
 
-  const head = headMatch[1]
+  // 2. font-display: swap or optional (prevents FOIT/CLS)
+  const hasFontDisplay = /font-display\s*:\s*(swap|optional|fallback)/i.test(html)
+  const usesGoogleFonts = /fonts\.googleapis\.com/i.test(html)
+  const fontDisplayInLink = /&display=(swap|optional|fallback)/i.test(html)
 
-  // Look for <link> tags pointing to agent-related resources
-  const linkRegex = /<link[^>]*>/gi
-  const links = head.match(linkRegex) || []
-
-  const discoveryLinks: string[] = []
-
-  for (const link of links) {
-    const href = link.match(/href\s*=\s*["']([^"']+)["']/i)?.[1] || ''
-    const rel = link.match(/rel\s*=\s*["']([^"']+)["']/i)?.[1] || ''
-    const type = link.match(/type\s*=\s*["']([^"']+)["']/i)?.[1] || ''
-
-    // Check for agent/LLM-related discovery links
-    if (
-      href.includes('llms.txt') ||
-      href.includes('agents.json') ||
-      href.includes('agent-instructions') ||
-      href.includes('agent-runbook') ||
-      href.includes('mcp.json') ||
-      rel === 'ai-instructions' ||
-      rel === 'agent-description' ||
-      (rel === 'alternate' && (type.includes('text/markdown') || type.includes('application/json'))) ||
-      (rel === 'sitemap' || (rel === 'alternate' && type.includes('sitemap')))
-    ) {
-      discoveryLinks.push(`${rel}: ${href}`)
-    }
+  if (hasFontDisplay || fontDisplayInLink) {
+    score += 2
+    findings.push('font-display korrekt gesetzt')
+  } else if (usesGoogleFonts) {
+    issues.push('Google Fonts ohne display=swap — FOIT-Risiko')
+  } else {
+    score += 2 // No custom fonts = no issue
+    findings.push('Keine Webfonts ohne font-display')
   }
 
-  const passed = discoveryLinks.length >= 1
+  // 3. Viewport meta tag (basic but important)
+  const hasViewport = /<meta[^>]*name=["']viewport["'][^>]*>/i.test(html)
+  if (hasViewport) {
+    score += 1
+    findings.push('Viewport-Meta vorhanden')
+  } else {
+    issues.push('Kein Viewport-Meta-Tag')
+  }
+
+  // 4. No document.write or blocking patterns
+  const hasDocWrite = /document\.write\s*\(/i.test(html)
+  if (!hasDocWrite) {
+    score += 2
+    findings.push('Kein document.write()')
+  } else {
+    issues.push('document.write() gefunden — blockiert Rendering und verursacht Layout-Shifts')
+  }
+
+  // Threshold: 6/8 = pass
+  const passed = score >= 6
+
+  const detailParts: string[] = []
+  if (findings.length > 0) detailParts.push(findings.join(' · '))
+  if (issues.length > 0) detailParts.push(`Verbesserungsbedarf: ${issues.join('; ')}`)
+  detailParts.push(`Score: ${score}/${maxScore}`)
 
   return {
-    id: 'auto-discovery-links',
-    title: 'Auto-Discovery Links im <head>',
-    description: 'Prüft, ob <link>-Tags im HTML <head> auf maschinenlesbare Ressourcen verweisen (llms.txt, agents.json, Sitemap etc.).',
+    id: 'layout-stability',
+    title: 'Layout-Stabilität (CLS)',
+    description:
+      'Prüft Indikatoren für stabile Layouts: Bilder mit width/height, font-display:swap, ' +
+      'keine bekannten CLS-verursachenden Patterns. Agenten brauchen stabile Layouts für zuverlässige Interaktion.',
     passed,
-    details: passed
-      ? `${discoveryLinks.length} Discovery-Link(s) gefunden: ${discoveryLinks.join(' · ')}`
-      : 'Keine Auto-Discovery <link>-Tags für KI-Ressourcen im <head> gefunden. Empfohlen: <link rel="alternate" type="text/markdown" href="/llms.txt">',
-  }
-}
-
-/* ─── Audit 8: schema-org-density ─── */
-
-async function auditSchemaOrgDensity(domain: string, html?: string): Promise<AuditResult> {
-  let pageHtml = html || ''
-
-  if (!pageHtml) {
-    const resp = await safeFetch(`https://${domain}`, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' },
-    })
-    if (resp?.ok) {
-      pageHtml = await resp.text().catch(() => '')
-    }
-  }
-
-  if (!pageHtml) {
-    return {
-      id: 'schema-org-density',
-      title: 'Schema.org-Dichte',
-      description: 'Prüft, ob die Homepage mindestens 2 JSON-LD Schema.org-Blöcke enthält.',
-      passed: false,
-      details: 'Website nicht erreichbar',
-    }
-  }
-
-  // Count JSON-LD blocks
-  const jsonLdRegex = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>/gi
-  const jsonLdBlocks = pageHtml.match(jsonLdRegex) || []
-  const count = jsonLdBlocks.length
-
-  // Extract types for detail
-  const typeRegex = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
-  const types: string[] = []
-  let match
-  while ((match = typeRegex.exec(pageHtml)) !== null) {
-    try {
-      const parsed = JSON.parse(match[1])
-      if (parsed['@graph']) {
-        for (const item of parsed['@graph']) {
-          if (item['@type']) {
-            const t = Array.isArray(item['@type']) ? item['@type'] : [item['@type']]
-            types.push(...t)
-          }
-        }
-      } else {
-        const t = parsed['@type']
-        if (t) types.push(...(Array.isArray(t) ? t : [t]))
-      }
-    } catch { /* skip invalid */ }
-  }
-
-  // Lighthouse threshold: ≥2 JSON-LD blocks = pass
-  const passed = count >= 2
-
-  return {
-    id: 'schema-org-density',
-    title: 'Schema.org-Dichte',
-    description: 'Prüft, ob die Homepage mindestens 2 JSON-LD Schema.org-Blöcke enthält (Schwellwert aus Lighthouse).',
-    passed,
-    details: count === 0
-      ? 'Kein JSON-LD Schema.org Markup auf der Homepage'
-      : passed
-        ? `${count} JSON-LD-Blöcke gefunden: ${types.join(', ')}`
-        : `Nur ${count} JSON-LD-Block gefunden (Mindestens 2 empfohlen). Typen: ${types.join(', ') || 'keine'}`,
-  }
-}
-
-/* ─── Audit 9: webmcp-annotations (placeholder) ─── */
-
-function auditWebMcpAnnotations(): AuditResult {
-  return {
-    id: 'webmcp-annotations',
-    title: 'WebMCP-Annotationen',
-    description: 'Prüft auf WebMCP data-*-Attribute für agentengesteuerte Formularinteraktion. Die Spezifikation ist noch in Entwicklung.',
-    passed: null, // skipped
-    details: 'Übersprungen — WebMCP-Spezifikation ist noch nicht finalisiert (Draft-Status). Wird in einem zukünftigen Update geprüft.',
-    learnMoreUrl: 'https://AminFazl.github.io/WebMCP/',
+    details: detailParts.join(' — '),
+    learnMoreUrl: 'https://web.dev/articles/cls',
   }
 }
 
@@ -520,43 +586,32 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Run fresh audit ──
-  // Run all audits (parallelize where possible)
-  const [
-    { audit: llmsTxtAudit, body: llmsTxtBody },
-    { audit: agentsJsonAudit, parsed: agentsJsonParsed },
-    sitemapAudit,
-    runbookAudit,
-    discoveryAudit,
-  ] = await Promise.all([
-    auditLlmsTxtPresent(domain),
-    auditAgentsJsonPresent(domain),
-    auditSitemapDiscoverable(domain),
-    auditAgentRunbookPresent(domain),
-    auditAutoDiscoveryLinks(domain),
+  // Fetch HTML once, then reuse for multiple audits
+  const [llmsTxtAudit, html] = await Promise.all([
+    auditLlmsTxt(domain),
+    safeFetchHtml(domain),
   ])
 
-  // Sequential audits that depend on previous results
-  const llmsWellFormedAudit = auditLlmsTxtWellFormed(llmsTxtBody, llmsTxtAudit.passed === true)
-  const actionsTypedAudit = auditAgentsJsonActionsTyped(agentsJsonParsed)
-  const schemaDensityAudit = await auditSchemaOrgDensity(domain)
-  const webMcpAudit = auditWebMcpAnnotations()
+  // HTML-based audits (no additional fetches needed)
+  const webMcpRegisteredAudit = auditWebMcpRegistered(html)
+  const webMcpFormsAudit = auditWebMcpForms(html)
+  const webMcpSchemaAudit = auditWebMcpSchema(html)
+  const a11yAudit = auditAgentAccessibility(html)
+  const layoutAudit = auditLayoutStability(html)
 
   const audits: AuditResult[] = [
     llmsTxtAudit,
-    llmsWellFormedAudit,
-    agentsJsonAudit,
-    actionsTypedAudit,
-    sitemapAudit,
-    runbookAudit,
-    discoveryAudit,
-    schemaDensityAudit,
-    webMcpAudit,
+    webMcpRegisteredAudit,
+    webMcpFormsAudit,
+    webMcpSchemaAudit,
+    a11yAudit,
+    layoutAudit,
   ]
 
   // Calculate pass ratio (excluding skipped/null audits)
-  const gradedAudits = audits.filter(a => a.passed !== null)
-  const passedCount = audits.filter(a => a.passed === true).length
-  const skippedCount = audits.filter(a => a.passed === null).length
+  const gradedAudits = audits.filter((a) => a.passed !== null)
+  const passedCount = audits.filter((a) => a.passed === true).length
+  const skippedCount = audits.filter((a) => a.passed === null).length
 
   const result = {
     domain,

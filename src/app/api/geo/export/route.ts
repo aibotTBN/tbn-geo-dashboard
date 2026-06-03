@@ -48,12 +48,8 @@ export async function GET(request: NextRequest) {
       return await generateSkillsMd(domain)
     }
 
-    if (format === 'agents.json') {
-      return await generateAgentsJson(domain)
-    }
-
-    if (format === 'agent-runbook.md') {
-      return await generateAgentRunbook(domain)
+    if (format === 'agents.json' || format === 'agent.json') {
+      return await generateA2AAgentCard(domain)
     }
 
     if (format === 'link-tags') {
@@ -476,9 +472,11 @@ async function generateSkillsMd(domain: string) {
   })
 }
 
-// ─── agents.json Generator (Lighthouse Agentic Browsing spec) ────────────────
+// ─── agent.json Generator (Google A2A Agent Card spec) ───────────────────────
+// Spec: https://google.github.io/A2A/#/documentation?id=agent-card
+// Deployed at: /.well-known/agent.json
 
-async function generateAgentsJson(domain: string) {
+async function generateA2AAgentCard(domain: string) {
   const [orgs, services, faqs, posts] = await Promise.all([
     fetchAllRows(TABLE_IDS.geo_organizations, domain),
     fetchAllRows(TABLE_IDS.geo_services, domain),
@@ -489,193 +487,119 @@ async function generateAgentsJson(domain: string) {
   const org = orgs[0]
   const orgName = org?.name || domain
 
-  // Build actions from available knowledge
-  const actions: any[] = [
-    {
-      name: 'get_company_overview',
-      description: `Erhalte eine Übersicht über ${orgName} — Unternehmensprofil, Standort, Gründung und Alleinstellungsmerkmale.`,
-      parameters: [
-        { name: 'domain', type: 'string', description: `Die Domain des Unternehmens`, required: true, default: domain },
-      ],
-      returns: { type: 'object', description: 'Unternehmensprofil mit Name, Beschreibung, Standort, Gründungsjahr, Team-Größe und USPs' },
-      endpoint: `https://${domain}/.well-known/skills.md`,
-    },
-  ]
+  // Build skills (A2A term for capabilities)
+  const skills: any[] = []
+
+  skills.push({
+    id: 'company-info',
+    name: 'Company Information',
+    description: `Provides structured information about ${orgName} — profile, location, founding, team, and unique selling points.`,
+    tags: ['company', 'profile', 'about'],
+    examples: [
+      `What does ${orgName} do?`,
+      `Tell me about ${orgName}`,
+      `Where is ${orgName} located?`,
+    ],
+  })
 
   if (services.length > 0) {
-    actions.push({
-      name: 'list_services',
-      description: `Liste aller ${services.length} Dienstleistungen/Produkte von ${orgName}.`,
-      parameters: [
-        { name: 'category', type: 'string', description: 'Optionaler Filter nach Kategorie', required: false },
+    skills.push({
+      id: 'services',
+      name: 'Services & Offerings',
+      description: `Lists and describes ${services.length} services/products offered by ${orgName}.`,
+      tags: ['services', 'products', 'offerings'],
+      examples: [
+        `What services does ${orgName} offer?`,
+        `Does ${orgName} offer ${services[0]?.name || 'consulting'}?`,
       ],
-      returns: { type: 'array', description: 'Liste von Dienstleistungen mit Name, Beschreibung und Zielgruppe' },
-      endpoint: `https://${domain}/llms.txt`,
     })
   }
 
   if (faqs.length > 0) {
-    actions.push({
-      name: 'search_faq',
-      description: `Durchsuche ${faqs.length} häufig gestellte Fragen über ${orgName}.`,
-      parameters: [
-        { name: 'query', type: 'string', description: 'Suchbegriff oder Frage', required: true },
+    skills.push({
+      id: 'faq',
+      name: 'Frequently Asked Questions',
+      description: `Answers ${faqs.length} common questions about ${orgName}.`,
+      tags: ['faq', 'help', 'questions'],
+      examples: [
+        `How does ${orgName} work?`,
+        `What are the pricing options?`,
       ],
-      returns: { type: 'array', description: 'Passende FAQ-Einträge mit Frage und Antwort' },
-      endpoint: `https://${domain}/llms.txt`,
     })
   }
 
   if (posts.length > 0) {
-    actions.push({
-      name: 'get_recent_content',
-      description: `Aktuelle Beiträge und Inhalte von ${orgName} (${posts.length} Artikel verfügbar).`,
-      parameters: [
-        { name: 'limit', type: 'integer', description: 'Maximale Anzahl Ergebnisse (Standard: 10)', required: false, default: 10 },
-        { name: 'topic', type: 'string', description: 'Optionaler Themen-Filter', required: false },
+    skills.push({
+      id: 'content',
+      name: 'Recent Content & Articles',
+      description: `Access to ${posts.length} blog posts and articles from ${orgName}.`,
+      tags: ['blog', 'articles', 'news', 'content'],
+      examples: [
+        `What has ${orgName} published recently?`,
+        `Latest news from ${orgName}`,
       ],
-      returns: { type: 'array', description: 'Artikel mit Titel, Zusammenfassung und Veröffentlichungsdatum' },
-      endpoint: `https://${domain}/llms.txt`,
     })
   }
 
-  // Contact action
-  actions.push({
-    name: 'get_contact_info',
-    description: `Kontaktdaten von ${orgName} — E-Mail, Telefon, Adresse, Website.`,
-    parameters: [],
-    returns: { type: 'object', description: 'Kontaktinformationen' },
-    endpoint: `https://${domain}/.well-known/skills.md`,
-  })
-
-  const agentsJson = {
-    schema_version: '1.0',
+  // A2A Agent Card — follows spec at google.github.io/A2A
+  const agentCard: any = {
+    // Required fields
     name: orgName,
-    description: org?.description
-      ? org.description.length > 200 ? org.description.slice(0, 200).trim() + '…' : org.description
-      : `Offizielle Website von ${orgName}`,
     url: `https://${domain}`,
-    logo: org?.logo || undefined,
-    contact: org?.email ? { email: org.email } : undefined,
-    documentation_url: `https://${domain}/.well-known/skills.md`,
-    capabilities: {
-      actions,
+    version: '1.0.0',
+
+    // Recommended fields
+    description: org?.description
+      ? org.description.length > 300 ? org.description.slice(0, 300).trim() + '…' : org.description
+      : `Official website and knowledge base of ${orgName}.`,
+
+    // Provider info
+    provider: {
+      organization: orgName,
+      url: `https://${domain}`,
     },
-    discovery: {
-      llms_txt: `https://${domain}/llms.txt`,
-      skills_md: `https://${domain}/.well-known/skills.md`,
-      mcp_json: `https://${domain}/.well-known/mcp.json`,
-      sitemap: `https://${domain}/sitemap.xml`,
+
+    // Capabilities as A2A skills
+    skills,
+
+    // Authentication (public, no auth needed for discovery files)
+    authentication: {
+      schemes: ['none'],
     },
-    updated: new Date().toISOString().split('T')[0],
+
+    // Discovery: additional machine-readable resources
+    additionalProperties: {
+      knowledgeEndpoints: {
+        llms_txt: `https://${domain}/llms.txt`,
+        skills_md: `https://${domain}/.well-known/skills.md`,
+        mcp_json: `https://${domain}/.well-known/mcp.json`,
+        schema_org: `https://${domain} (embedded JSON-LD)`,
+      },
+      generator: 'LLM Radar (llmradar.de)',
+      updated: new Date().toISOString().split('T')[0],
+    },
   }
 
+  // Add optional org fields
+  if (org?.email) agentCard.provider.email = org.email
+  if (org?.logo) agentCard.provider.logo = org.logo
+
   // Remove undefined values
-  const cleaned = JSON.parse(JSON.stringify(agentsJson))
+  const cleaned = JSON.parse(JSON.stringify(agentCard))
 
   return NextResponse.json(cleaned)
 }
 
-// ─── agent-runbook.md Generator ──────────────────────────────────────────────
-
-async function generateAgentRunbook(domain: string) {
-  const [orgs, services, faqs] = await Promise.all([
-    fetchAllRows(TABLE_IDS.geo_organizations, domain),
-    fetchAllRows(TABLE_IDS.geo_services, domain),
-    fetchAllRows(TABLE_IDS.geo_faq, domain),
-  ])
-
-  const org = orgs[0]
-  const orgName = org?.name || domain
-
-  const lines: string[] = [
-    `# Agent Instructions for ${domain}`,
-    '',
-    `> This document describes how AI agents should interact with ${orgName}'s website.`,
-    '',
-    '## Overview',
-    '',
-    `${orgName} provides structured, machine-readable data for AI agents.`,
-    `Use the discovery files listed below to find information about the organization, its services, and content.`,
-    '',
-    '## Discovery Files',
-    '',
-    '| File | URL | Purpose |',
-    '|------|-----|---------|',
-    `| llms.txt | https://${domain}/llms.txt | Natural-language overview for LLM crawlers |`,
-    `| skills.md | https://${domain}/.well-known/skills.md | Detailed company profile, services, team, FAQ |`,
-    `| mcp.json | https://${domain}/.well-known/mcp.json | MCP Server Discovery for AI agents |`,
-    `| agents.json | https://${domain}/.well-known/agents.json | Agent capabilities and typed actions |`,
-    `| sitemap.xml | https://${domain}/sitemap.xml | Full page index for crawling |`,
-    '',
-    '## How to Interact',
-    '',
-    '### Retrieving Information',
-    '',
-    '1. **Start with `llms.txt`** — Provides a concise overview of all available knowledge.',
-    '2. **For detailed data**, use `skills.md` — Contains full company profile, services, team bios, FAQ, and case studies.',
-    '3. **For structured queries**, use the MCP endpoint defined in `mcp.json`.',
-    '4. **For web pages**, use `sitemap.xml` to discover all available pages.',
-    '',
-    '### Answering Questions',
-    '',
-  ]
-
-  // Dynamic section based on actual data
-  if (org) {
-    lines.push(`- For questions about *${orgName}*, refer to \`skills.md\` — Section "About".`)
-  }
-  if (services.length > 0) {
-    lines.push(`- For questions about services (${services.length} available), refer to \`skills.md\` — Section "Services".`)
-  }
-  if (faqs.length > 0) {
-    lines.push(`- For common questions, check the FAQ section (${faqs.length} entries) in \`skills.md\`.`)
-  }
-  lines.push(`- For recent content and articles, refer to \`llms.txt\` or \`skills.md\` — Section "Recent Content".`)
-  lines.push('')
-
-  lines.push('### Citing Information')
-  lines.push('')
-  lines.push(`When referencing information from ${domain}:`)
-  lines.push(`- Always attribute the source as "${orgName}" (${domain}).`)
-  lines.push(`- Link to specific pages when available (use sitemap.xml to find URLs).`)
-  lines.push('- Prefer structured data from skills.md over scraped page content.')
-  lines.push('')
-
-  lines.push('## Restrictions')
-  lines.push('')
-  lines.push('- **Do not** submit forms, create accounts, or make purchases on behalf of users without explicit consent.')
-  lines.push('- **Do not** scrape content for training purposes — use the provided structured files instead.')
-  lines.push('- **Respect** `robots.txt` directives for crawling.')
-  lines.push(`- **Rate limit**: Keep requests reasonable (max 1 request/second).`)
-  lines.push('')
-
-  lines.push('## Data Freshness')
-  lines.push('')
-  lines.push('- Discovery files (llms.txt, skills.md) are regenerated from the knowledge base periodically.')
-  lines.push('- Check the `updated` field in agents.json for the last update date.')
-  lines.push('- For the most current information, use the MCP endpoint.')
-  lines.push('')
-
-  lines.push('---')
-  lines.push(`*Generated by LLM Radar for ${domain} — ${new Date().toISOString().split('T')[0]}*`)
-
-  const content = lines.join('\n')
-  return new NextResponse(content, {
-    headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
-  })
-}
-
 // ─── Auto-Discovery <link> Tags Generator ────────────────────────────────────
+// Best practice for AI agent discoverability (not a Lighthouse audit, but useful)
 
 async function generateLinkTags(domain: string) {
   const tags = [
     `<!-- AI Agent Discovery Links — place in <head> -->`,
     `<link rel="alternate" type="text/markdown" href="https://${domain}/llms.txt" title="LLMs.txt" />`,
-    `<link rel="alternate" type="application/json" href="https://${domain}/.well-known/agents.json" title="Agents JSON" />`,
+    `<link rel="alternate" type="application/json" href="https://${domain}/.well-known/agent.json" title="A2A Agent Card" />`,
     `<link rel="alternate" type="application/json" href="https://${domain}/.well-known/mcp.json" title="MCP Discovery" />`,
     `<link rel="alternate" type="text/markdown" href="https://${domain}/.well-known/skills.md" title="Skills Profile" />`,
-    `<link rel="alternate" type="text/markdown" href="https://${domain}/agent-instructions.md" title="Agent Instructions" />`,
     `<link rel="sitemap" type="application/xml" href="https://${domain}/sitemap.xml" title="Sitemap" />`,
   ]
 
