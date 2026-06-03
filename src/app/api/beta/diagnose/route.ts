@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { triggerDiagnose } from '@/lib/n8n'
 import { prisma } from '@/lib/prisma'
 import { pushLead } from '@/lib/mailingwork'
+import { computeTechScore, computeSchemaScore } from '@/lib/local-scoring'
 
 /**
  * Beta Diagnose — unauthenticated, rate-limited GEO analysis.
@@ -144,9 +145,21 @@ export async function POST(request: NextRequest) {
       create: { domain, name: domain },
     })
 
-    // Trigger n8n diagnosis
-    const raw = await triggerDiagnose(domain, domain, 'B2B', '')
+    // Run n8n diagnosis + local checks in parallel
+    const [raw, localTech, localSchema] = await Promise.all([
+      triggerDiagnose(domain, domain, 'B2B', ''),
+      computeTechScore(domain).catch(() => ({ score: 0, checks: {} })),
+      computeSchemaScore(domain).catch(() => ({ score: 0, count: 0, types: [], errors: [] })),
+    ])
     const result = normalizeResult(raw)
+
+    // Use the higher of n8n vs local scores for Tech & Schema
+    const n8nTech = result.scoreTech
+    const n8nSchema = result.scoreSchema
+    if (localTech.score > result.scoreTech) result.scoreTech = localTech.score
+    if (localSchema.score > result.scoreSchema) result.scoreSchema = localSchema.score
+    const scoreDelta = (result.scoreTech - n8nTech) + (result.scoreSchema - n8nSchema)
+    if (scoreDelta > 0) result.score += scoreDelta
 
     // Save to DB
     if (result.score > 0) {

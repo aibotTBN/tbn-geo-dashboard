@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { triggerDiagnose } from '@/lib/n8n'
 import { sendMonitoringAlertEmail } from '@/lib/email'
+import { computeTechScore, computeSchemaScore } from '@/lib/local-scoring'
 
 /**
  * GET /api/geo/monitoring-cron
@@ -85,14 +86,27 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      // Run diagnosis via n8n
-      const raw = await triggerDiagnose(
-        project.domain,
-        project.name,
-        project.industry || 'B2B',
-        project.coreTopics || ''
-      )
+      // Run n8n diagnosis + local checks in parallel
+      const [raw, localTech, localSchema] = await Promise.all([
+        triggerDiagnose(
+          project.domain,
+          project.name,
+          project.industry || 'B2B',
+          project.coreTopics || ''
+        ),
+        computeTechScore(project.domain).catch(() => ({ score: 0, checks: {} })),
+        computeSchemaScore(project.domain).catch(() => ({ score: 0, count: 0, types: [], errors: [] })),
+      ])
       const result = normalizeResult(raw)
+
+      // Use the higher of n8n vs local scores for Tech & Schema
+      const n8nTech = result.score_tech
+      const n8nSchema = result.score_schema
+      if (localTech.score > result.score_tech) result.score_tech = localTech.score
+      if (localSchema.score > result.score_schema) result.score_schema = localSchema.score
+      const techDelta = result.score_tech - n8nTech
+      const schemaDelta = result.score_schema - n8nSchema
+      if (techDelta > 0 || schemaDelta > 0) result.geo_score += techDelta + schemaDelta
 
       if (result.geo_score <= 0 && !raw?.report?.scores) {
         results.push({ domain: project.domain, status: 'skipped (empty result)' })
