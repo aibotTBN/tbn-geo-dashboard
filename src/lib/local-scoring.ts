@@ -62,32 +62,51 @@ export async function computeTechScore(domain: string): Promise<TechCheckResult>
   const checks: TechCheckResult['checks'] = {}
   let score = 0
 
-  // Run all checks in parallel
+  // Run all checks in parallel.
+  // Many WordPress / CDN setups redirect /file to www.domain/file (301) where
+  // the file doesn't exist, but serve it correctly under /.well-known/file.
+  // We therefore check BOTH paths for every KI-specific file.
   const [
     robotsTxt,
     sitemapExists,
+    sitemapWww,
     llmsTxt,
+    llmsTxtWK,
     mcpJson,
+    mcpJsonWK,
     agentJson,
+    agentCardJson,
     wellKnownAgent,
+    wellKnownAgentCard,
     homepage,
   ] = await Promise.all([
     fetchText(`${base}/robots.txt`),
     urlExists(`${base}/sitemap.xml`),
+    urlExists(`${base}/sitemap_index.xml`),    // WordPress / Yoast
     fetchText(`${base}/llms.txt`),
+    fetchText(`${base}/.well-known/llms.txt`),
     fetchText(`${base}/mcp.json`),
+    fetchText(`${base}/.well-known/mcp.json`), // WordPress .well-known path
     fetchText(`${base}/agent.json`),
+    fetchText(`${base}/agent-card.json`),       // methodology uses this name
     fetchText(`${base}/.well-known/agent.json`),
+    fetchText(`${base}/.well-known/agent-card.json`),
     fetchText(base),
   ])
+
+  // Helper: try to parse JSON, return true if valid
+  function isValidJson(text: string | null): boolean {
+    if (!text) return false
+    try { JSON.parse(text); return true } catch { return false }
+  }
 
   // 1. robots.txt (2 pts)
   const hasRobots = !!robotsTxt && robotsTxt.length > 10
   checks['robots.txt'] = { found: hasRobots, points: hasRobots ? 2 : 0 }
   if (hasRobots) score += 2
 
-  // 2. sitemap.xml (2 pts) — direct URL or referenced in robots.txt
-  const hasSitemap = sitemapExists || (!!robotsTxt && /sitemap/i.test(robotsTxt))
+  // 2. sitemap.xml (2 pts) — direct URL, _index.xml, or referenced in robots.txt
+  const hasSitemap = sitemapExists || sitemapWww || (!!robotsTxt && /sitemap/i.test(robotsTxt))
   checks['sitemap.xml'] = { found: hasSitemap, points: hasSitemap ? 2 : 0 }
   if (hasSitemap) score += 2
 
@@ -96,39 +115,47 @@ export async function computeTechScore(domain: string): Promise<TechCheckResult>
   checks['SSL/HTTPS'] = { found: hasSSL, points: hasSSL ? 2 : 0 }
   if (hasSSL) score += 2
 
-  // 4. llms.txt (4 pts)
-  const hasLlms = !!llmsTxt && llmsTxt.trim().length > 20
+  // 4. llms.txt (4 pts) — check root and .well-known
+  const llmsContent = (llmsTxt && llmsTxt.trim().length > 20) ? llmsTxt : llmsTxtWK
+  const hasLlms = !!llmsContent && llmsContent.trim().length > 20
   checks['llms.txt'] = {
     found: hasLlms,
     points: hasLlms ? 4 : 0,
-    detail: hasLlms ? `${llmsTxt!.trim().length} Zeichen` : undefined,
+    detail: hasLlms ? `${llmsContent!.trim().length} Zeichen` : undefined,
   }
   if (hasLlms) score += 4
 
-  // 5. mcp.json (4 pts)
-  let hasMcp = false
-  if (mcpJson) {
-    try {
-      JSON.parse(mcpJson)
-      hasMcp = true
-    } catch { /* invalid JSON */ }
+  // 5. mcp.json (4 pts) — check root and .well-known
+  const mcpContent = mcpJson || mcpJsonWK
+  const hasMcp = isValidJson(mcpContent)
+  checks['mcp.json'] = {
+    found: hasMcp,
+    points: hasMcp ? 4 : 0,
+    detail: hasMcp ? (mcpJsonWK && !isValidJson(mcpJson) ? '.well-known/mcp.json' : '/mcp.json') : undefined,
   }
-  checks['mcp.json'] = { found: hasMcp, points: hasMcp ? 4 : 0 }
   if (hasMcp) score += 4
 
-  // 6. agent.json (3 pts) — check both /agent.json and /.well-known/agent.json
+  // 6. agent.json / agent-card.json (3 pts)
+  // Check all 4 variants: /agent.json, /agent-card.json, .well-known/agent.json, .well-known/agent-card.json
   let hasAgent = false
-  const agentContent = agentJson || wellKnownAgent
-  if (agentContent) {
-    try {
-      JSON.parse(agentContent)
+  let agentLocation = ''
+  const agentCandidates: [string | null, string][] = [
+    [agentJson, '/agent.json'],
+    [agentCardJson, '/agent-card.json'],
+    [wellKnownAgent, '/.well-known/agent.json'],
+    [wellKnownAgentCard, '/.well-known/agent-card.json'],
+  ]
+  for (const [content, path] of agentCandidates) {
+    if (isValidJson(content)) {
       hasAgent = true
-    } catch { /* invalid JSON */ }
+      agentLocation = path
+      break
+    }
   }
-  checks['agent.json'] = {
+  checks['agent-card.json'] = {
     found: hasAgent,
     points: hasAgent ? 3 : 0,
-    detail: hasAgent ? (wellKnownAgent ? '.well-known/agent.json' : '/agent.json') : undefined,
+    detail: hasAgent ? agentLocation : undefined,
   }
   if (hasAgent) score += 3
 
