@@ -8,20 +8,19 @@ import { Cookie, X } from 'lucide-react'
  * GDPR-compliant cookie consent banner.
  * 
  * LLM Radar uses:
- * - Essential cookies: NextAuth session (strictly necessary, no consent needed)
- * - Stripe: payment processing cookies (strictly necessary for checkout)
+ * - Essential cookies: NextAuth session, Stripe (strictly necessary)
+ * - Analytics: Google Analytics (G-RSPTTB8D12)
+ * - Marketing: Meta Pixel (25388119420886052)
  * 
- * No analytics/marketing cookies are currently used.
- * If Google Analytics or tracking is added later, this banner needs an "accept/reject" split.
+ * Analytics & marketing scripts load via Next.js Script afterInteractive.
+ * Cookie consent is tracked in localStorage.
  */
 export function CookieBanner() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    // Check if user already acknowledged cookies
     const consent = localStorage.getItem('cookie-consent')
     if (!consent) {
-      // Delay showing to avoid layout shift on first paint
       const timer = setTimeout(() => setVisible(true), 1500)
       return () => clearTimeout(timer)
     }
@@ -48,8 +47,9 @@ export function CookieBanner() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-gray-700 leading-relaxed">
-              Diese Website verwendet ausschließlich <strong>technisch notwendige Cookies</strong> für 
-              Authentifizierung und Zahlungsabwicklung. Es werden keine Tracking- oder Marketing-Cookies eingesetzt.
+              Diese Website verwendet <strong>technisch notwendige Cookies</strong> (Authentifizierung, Zahlung) 
+              sowie <strong>Analyse-Cookies</strong> (Google Analytics, Meta Pixel), um unsere Werbung und das 
+              Nutzererlebnis zu verbessern.
             </p>
             <p className="text-xs text-gray-400 mt-1.5">
               Mehr dazu in unserer{' '}
