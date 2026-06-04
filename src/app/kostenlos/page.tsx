@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Radar, ArrowRight, CheckCircle2, Eye, Shield, FileText, Clock, BarChart3, Zap, Globe2, Lock, Loader2, AlertCircle, TrendingUp, ExternalLink, ChevronDown, ChevronUp, Sparkles, Lightbulb, AlertTriangle, Search, Bot } from 'lucide-react'
+import { Radar, ArrowRight, CheckCircle2, Eye, Shield, FileText, Clock, BarChart3, Zap, Globe2, Lock, Loader2, AlertCircle, TrendingUp, ExternalLink, ChevronDown, ChevronUp, Sparkles, Lightbulb, AlertTriangle, Search, Bot, BookOpen, Mail, Gift } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────
    LLM Radar — /kostenlos Landing Page
@@ -132,6 +132,11 @@ export default function KostenlosPage() {
       return
     }
 
+    if (!email || !email.includes('@')) {
+      setErrorMsg('Bitte geben Sie Ihre E-Mail-Adresse ein — wir senden Ihnen den kostenlosen GEO-Leitfaden zu.')
+      return
+    }
+
     // Fire Lead pixel event
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Lead', {
@@ -144,17 +149,15 @@ export default function KostenlosPage() {
     setProgress(0)
     setProgressText('Analyse wird vorbereitet…')
 
-    // Register on waitlist if email provided
-    if (email && email.includes('@')) {
-      try {
-        await fetch('/api/waitlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, source: 'kostenlos_landing' }),
-        })
-      } catch {
-        // Non-critical
-      }
+    // Register email for eBook delivery + nurture sequence
+    try {
+      await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, source: 'kostenlos_landing', ebook: true }),
+      })
+    } catch {
+      // Non-critical — analysis still runs
     }
 
     // Simulate progress
@@ -171,7 +174,7 @@ export default function KostenlosPage() {
       const res = await fetch('/api/beta/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: cleanDomain, email: email || `anon+${cleanDomain}@llmradar.de` }),
+        body: JSON.stringify({ domain: cleanDomain, email }),
       })
 
       clearInterval(progressInterval)
@@ -244,8 +247,8 @@ export default function KostenlosPage() {
           <div className="text-center">
             {/* Trust badge */}
             <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-1.5 mb-6">
-              <CheckCircle2 className="w-4 h-4 text-green-600" />
-              <span className="text-sm font-medium text-green-700">100% kostenlos · Keine Kreditkarte</span>
+              <Gift className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-medium text-green-700">Kostenlose Analyse + GEO-Leitfaden gratis</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight leading-tight">
@@ -282,10 +285,10 @@ export default function KostenlosPage() {
 
                 <div>
                   <label htmlFor="kl-email" className="block text-sm font-medium text-gray-700 text-left mb-1.5">
-                    E-Mail <span className="text-gray-400 font-normal">(optional — für Ihren Report)</span>
+                    E-Mail <span className="text-blue-600 font-normal">— für Ihren kostenlosen GEO-Leitfaden</span>
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                       id="kl-email"
                       type="email"
@@ -293,7 +296,17 @@ export default function KostenlosPage() {
                       onChange={(e) => { setEmail(e.target.value); setErrorMsg('') }}
                       placeholder="ihre@email.de"
                       className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-gray-50 border-2 border-gray-200 focus:border-blue-500 focus:bg-white text-gray-900 placeholder:text-gray-400 text-base outline-none transition-all"
+                      required
                     />
+                  </div>
+                </div>
+
+                {/* eBook incentive */}
+                <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-left">
+                  <BookOpen className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Gratis: Der GEO-Leitfaden</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Erfahren Sie, wie Sie Ihre Sichtbarkeit in ChatGPT, Claude & Co. gezielt verbessern — direkt per E-Mail.</p>
                   </div>
                 </div>
 
@@ -306,16 +319,16 @@ export default function KostenlosPage() {
 
                 <button
                   onClick={startAnalysis}
-                  disabled={!domain}
+                  disabled={!domain || !email}
                   className="w-full py-4 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 hover:shadow-blue-700/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600 active:scale-[0.98]"
                 >
                   <Search className="w-5 h-5" />
-                  Kostenlose Analyse starten
+                  Analyse starten & Leitfaden sichern
                 </button>
               </div>
 
               <p className="mt-4 text-xs text-gray-400 text-center">
-                Kein Abo · Kein Spam · Ergebnis in ca. 60 Sekunden
+                Kein Abo · Kein Spam · Ergebnis in ca. 60 Sekunden · Leitfaden per E-Mail
               </p>
             </div>
 
@@ -379,10 +392,17 @@ export default function KostenlosPage() {
               <p className="text-xs text-gray-400 mt-2">{progress}%</p>
             </div>
 
-            <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-4 max-w-sm mx-auto">
-              <p className="text-xs text-blue-700 leading-relaxed">
-                <strong>Wussten Sie?</strong> Über 30% der B2B-Entscheider nutzen bereits KI-Assistenten für die Anbieterrecherche. Tendenz: stark steigend.
-              </p>
+            <div className="mt-8 space-y-3 max-w-sm mx-auto">
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  <strong>📖 Ihr GEO-Leitfaden</strong> wird parallel an <strong>{email}</strong> gesendet — schauen Sie gleich in Ihr Postfach!
+                </p>
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <p className="text-xs text-blue-700 leading-relaxed">
+                  <strong>Wussten Sie?</strong> Über 30% der B2B-Entscheider nutzen bereits KI-Assistenten für die Anbieterrecherche. Tendenz: stark steigend.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -438,6 +458,17 @@ export default function KostenlosPage() {
                 <SubScoreBar label="Schema Markup" score={result.scoreSchema} maxScore={20} icon={FileText} color="text-purple-600" />
                 <SubScoreBar label="Content-Qualität" score={result.scoreContent} maxScore={15} icon={BarChart3} color="text-emerald-600" />
                 <SubScoreBar label="Content-Aktualität" score={result.scoreFresh} maxScore={15} icon={Clock} color="text-orange-600" />
+              </div>
+            </div>
+
+            {/* eBook confirmation */}
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-green-900">GEO-Leitfaden unterwegs!</p>
+                <p className="text-xs text-green-700 mt-0.5">
+                  Der kostenlose Leitfaden wurde an <strong>{email}</strong> gesendet. Erfahren Sie darin, wie Sie Ihren Score gezielt verbessern.
+                </p>
               </div>
             </div>
 
