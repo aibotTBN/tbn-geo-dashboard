@@ -128,220 +128,293 @@ async function auditLlmsTxt(domain: string): Promise<AuditResult> {
 /* ═══════════════════════════════════════════════════════════════
    Audit 2: Registered WebMCP tools
    Real Lighthouse audit: "Registered WebMCP tools"
-   Checks for declarative (<template data-webmcp-tool>) or
-   imperative (navigator.ai.registerTool) WebMCP registrations.
+   Spec (May 2026): https://developer.chrome.com/docs/lighthouse/agentic-browsing/registered-webmcp-tools
+   Checks for:
+     - Declarative API: <form toolname="..." tooldescription="...">
+     - Imperative API: navigator.modelContext.registerTool(...)
+   Legacy: also detects <template data-webmcp-tool> (old spec)
    ═══════════════════════════════════════════════════════════════ */
 
 function auditWebMcpRegistered(html: string): AuditResult {
+  const LEARN_MORE = 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/registered-webmcp-tools'
+  const BASE_DESC =
+    'Prüft, ob die Website WebMCP-Tools registriert hat — deklarativ via ' +
+    'toolname/tooldescription auf <form>-Elementen oder imperativ via navigator.modelContext.registerTool().'
+
   if (!html) {
     return {
       id: 'webmcp-registered',
       title: 'Registrierte WebMCP-Tools',
-      description:
-        'Prüft, ob die Website WebMCP-Tools registriert hat — entweder deklarativ via ' +
-        '<template data-webmcp-tool> oder imperativ via navigator.ai.registerTool().',
+      description: BASE_DESC,
       passed: false,
       details: 'Website nicht erreichbar — konnte nicht auf WebMCP-Tools prüfen',
-      learnMoreUrl: 'https://AminFazl.github.io/WebMCP/',
+      learnMoreUrl: LEARN_MORE,
     }
   }
 
-  // Check for declarative WebMCP: <template data-webmcp-tool="...">
-  const declarativePattern = /data-webmcp-tool/gi
-  const declarativeMatches = html.match(declarativePattern) || []
+  // ── Declarative API (current spec): <form toolname="..." tooldescription="...">
+  const formToolPattern = /<form[^>]*\btoolname\s*=\s*["']([^"']+)["'][^>]*/gi
+  const declarativeForms = html.match(formToolPattern) || []
+  const declarativeCount = declarativeForms.length
 
-  // Check for imperative WebMCP: navigator.ai.registerTool
-  const imperativePattern = /navigator\.ai\.registerTool/gi
+  // ── Imperative API (current spec): navigator.modelContext.registerTool
+  const imperativePattern = /navigator\.modelContext\.registerTool/gi
   const imperativeMatches = html.match(imperativePattern) || []
-
-  // Also check for WebMCP meta tags or link references
-  const webmcpMeta = /webmcp/gi
-  const webmcpRefs = html.match(webmcpMeta) || []
-
-  const declarativeCount = declarativeMatches.length
   const imperativeCount = imperativeMatches.length
-  const totalTools = declarativeCount + imperativeCount
 
+  // ── Legacy: <template data-webmcp-tool> (old spec, still counted)
+  const legacyPattern = /data-webmcp-tool/gi
+  const legacyMatches = html.match(legacyPattern) || []
+  const legacyCount = legacyMatches.length
+
+  // ── Legacy: navigator.ai.registerTool (old API name)
+  const legacyImperative = /navigator\.ai\.registerTool/gi
+  const legacyImpMatches = html.match(legacyImperative) || []
+  const legacyImpCount = legacyImpMatches.length
+
+  const totalTools = declarativeCount + imperativeCount + legacyCount + legacyImpCount
   const passed = totalTools > 0
 
   let details: string
   if (passed) {
     const parts: string[] = []
-    if (declarativeCount > 0) parts.push(`${declarativeCount} deklarativ (data-webmcp-tool)`)
-    if (imperativeCount > 0) parts.push(`${imperativeCount} imperativ (navigator.ai.registerTool)`)
+    if (declarativeCount > 0) parts.push(`${declarativeCount}× deklarativ (toolname auf <form>)`)
+    if (imperativeCount > 0) parts.push(`${imperativeCount}× imperativ (navigator.modelContext.registerTool)`)
+    if (legacyCount > 0) parts.push(`${legacyCount}× Legacy (data-webmcp-tool — bitte auf toolname migrieren)`)
+    if (legacyImpCount > 0) parts.push(`${legacyImpCount}× Legacy (navigator.ai.registerTool)`)
     details = `${totalTools} WebMCP-Tool(s) registriert: ${parts.join(', ')}`
   } else {
-    details = webmcpRefs.length > 0
-      ? 'WebMCP-Referenzen im HTML gefunden, aber keine Tool-Registrierungen. Nutzen Sie <template data-webmcp-tool="name"> für deklarative Tools.'
-      : 'Keine WebMCP-Tool-Registrierungen gefunden. Lighthouse erwartet mindestens ein Tool via <template data-webmcp-tool> oder navigator.ai.registerTool().'
+    details =
+      'Keine WebMCP-Tool-Registrierungen gefunden. ' +
+      'Fügen Sie toolname und tooldescription Attribute auf Ihren <form>-Elementen hinzu, ' +
+      'oder nutzen Sie navigator.modelContext.registerTool() für die imperative API.'
   }
 
   return {
     id: 'webmcp-registered',
     title: 'Registrierte WebMCP-Tools',
-    description:
-      'Prüft, ob die Website WebMCP-Tools registriert hat — entweder deklarativ via ' +
-      '<template data-webmcp-tool> oder imperativ via navigator.ai.registerTool().',
+    description: BASE_DESC,
     passed,
     details,
-    learnMoreUrl: 'https://AminFazl.github.io/WebMCP/',
+    learnMoreUrl: LEARN_MORE,
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════
    Audit 3: Forms missing declarative WebMCP
    Real Lighthouse audit: "Forms missing declarative WebMCP"
-   Checks if <form> elements have WebMCP annotations.
+   Spec: https://developer.chrome.com/docs/lighthouse/agentic-browsing/forms-missing-declarative-webmcp
+   Checks if <form> elements have both toolname AND tooldescription.
    ═══════════════════════════════════════════════════════════════ */
 
 function auditWebMcpForms(html: string): AuditResult {
+  const LEARN_MORE = 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/forms-missing-declarative-webmcp'
+  const BASE_DESC =
+    'Prüft, ob alle <form>-Elemente auf der Seite sowohl toolname als auch tooldescription haben, ' +
+    'damit KI-Agenten Formulare verstehen und automatisch ausfüllen können.'
+
   if (!html) {
     return {
       id: 'webmcp-forms',
       title: 'Formulare mit WebMCP-Annotationen',
-      description:
-        'Prüft, ob alle <form>-Elemente auf der Seite deklarative WebMCP-Annotationen haben, ' +
-        'damit KI-Agenten Formulare verstehen und ausfüllen können.',
+      description: BASE_DESC,
       passed: null,
       details: 'Website nicht erreichbar — konnte nicht auf Formulare prüfen',
+      learnMoreUrl: LEARN_MORE,
     }
   }
 
-  // Count forms
-  const formPattern = /<form[\s>]/gi
-  const forms = html.match(formPattern) || []
-  const formCount = forms.length
+  // Extract all <form ...> opening tags
+  const formTagPattern = /<form\b[^>]*>/gi
+  const formTags = html.match(formTagPattern) || []
+  const formCount = formTags.length
 
   if (formCount === 0) {
     return {
       id: 'webmcp-forms',
       title: 'Formulare mit WebMCP-Annotationen',
-      description:
-        'Prüft, ob alle <form>-Elemente auf der Seite deklarative WebMCP-Annotationen haben, ' +
-        'damit KI-Agenten Formulare verstehen und ausfüllen können.',
-      passed: null, // No forms = N/A
+      description: BASE_DESC,
+      passed: null,
       details: 'Keine Formulare auf der Seite gefunden — Audit nicht anwendbar.',
+      learnMoreUrl: LEARN_MORE,
     }
   }
 
-  // Check if forms have WebMCP annotations nearby
-  // Look for data-webmcp-tool attributes near/inside form elements
-  const formWebMcpPattern = /<form[^>]*data-webmcp|data-webmcp-tool[^>]*>[\s\S]*?<form|<template[^>]*data-webmcp-tool[\s\S]*?<\/template>[\s]*<form/gi
-  const annotatedForms = html.match(formWebMcpPattern) || []
+  // Check each form for toolname + tooldescription
+  let annotatedCount = 0
+  let partialCount = 0 // has one but not both
 
-  // Simpler check: count templates with data-webmcp-tool that seem form-related
-  const webmcpTemplates = (html.match(/<template[^>]*data-webmcp-tool/gi) || []).length
+  for (const tag of formTags) {
+    const hasToolname = /\btoolname\s*=/i.test(tag)
+    const hasTooldescription = /\btooldescription\s*=/i.test(tag)
+    // Also accept legacy data-webmcp-tool as partial credit
+    const hasLegacy = /data-webmcp-tool/i.test(tag)
 
-  // If we have at least as many WebMCP templates as forms, likely covered
-  const passed = webmcpTemplates >= formCount || annotatedForms.length > 0
+    if (hasToolname && hasTooldescription) {
+      annotatedCount++
+    } else if (hasToolname || hasTooldescription || hasLegacy) {
+      partialCount++
+    }
+  }
+
+  const passed = annotatedCount === formCount
+
+  let details: string
+  if (passed) {
+    details = `${formCount} Formular(e) gefunden — alle mit toolname + tooldescription annotiert.`
+  } else if (annotatedCount > 0 || partialCount > 0) {
+    const parts: string[] = []
+    if (annotatedCount > 0) parts.push(`${annotatedCount} vollständig annotiert`)
+    if (partialCount > 0) parts.push(`${partialCount} unvollständig (toolname oder tooldescription fehlt)`)
+    parts.push(`${formCount - annotatedCount - partialCount} ohne Annotationen`)
+    details = `${formCount} Formular(e) gefunden: ${parts.join(', ')}. ` +
+      'Jedes <form> braucht sowohl toolname als auch tooldescription.'
+  } else {
+    details = `${formCount} Formular(e) gefunden, aber keines mit WebMCP-Annotationen. ` +
+      'Fügen Sie toolname="..." und tooldescription="..." auf Ihren <form>-Elementen hinzu.'
+  }
 
   return {
     id: 'webmcp-forms',
     title: 'Formulare mit WebMCP-Annotationen',
-    description:
-      'Prüft, ob alle <form>-Elemente auf der Seite deklarative WebMCP-Annotationen haben, ' +
-      'damit KI-Agenten Formulare verstehen und ausfüllen können.',
+    description: BASE_DESC,
     passed,
-    details: passed
-      ? `${formCount} Formular(e) gefunden, WebMCP-Annotationen vorhanden.`
-      : `${formCount} Formular(e) gefunden, aber keine deklarativen WebMCP-Annotationen (<template data-webmcp-tool>). ` +
-        `Agenten können diese Formulare nicht automatisch ausfüllen.`,
-    learnMoreUrl: 'https://AminFazl.github.io/WebMCP/',
+    details,
+    learnMoreUrl: LEARN_MORE,
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════
    Audit 4: WebMCP schema validity
    Real Lighthouse audit: "WebMCP schema validity"
-   Validates the structure of WebMCP tool declarations.
+   Spec: https://developer.chrome.com/docs/lighthouse/agentic-browsing/webmcp-schema-validity
+   Checks:
+     - Every form with toolname also has tooldescription (and vice versa)
+     - Required fields have a name attribute
+     - Inputs have toolparamdescription or an associated <label>
    ═══════════════════════════════════════════════════════════════ */
 
 function auditWebMcpSchema(html: string): AuditResult {
+  const LEARN_MORE = 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/webmcp-schema-validity'
+  const BASE_DESC =
+    'Prüft, ob die deklarierten WebMCP-Formulare eine gültige Schema-Struktur haben: ' +
+    'toolname + tooldescription auf <form>, name auf allen Inputs, toolparamdescription für Parameterhinweise.'
+
   if (!html) {
     return {
       id: 'webmcp-schema',
       title: 'WebMCP-Schema gültig',
-      description:
-        'Prüft, ob die deklarierten WebMCP-Tools eine gültige Schema-Struktur haben ' +
-        '(korrekte Attribute, Typ-Annotationen, beschreibende Inhalte).',
+      description: BASE_DESC,
       passed: null,
       details: 'Website nicht erreichbar',
+      learnMoreUrl: LEARN_MORE,
     }
   }
 
-  // Extract all WebMCP template declarations
-  const templatePattern = /<template[^>]*data-webmcp-tool[^>]*>[\s\S]*?<\/template>/gi
-  const templates = html.match(templatePattern) || []
+  // Extract form blocks: <form ...>...</form>
+  // Use a simpler approach: find forms with toolname or tooldescription
+  const formTagPattern = /<form\b[^>]*>/gi
+  const formTags = html.match(formTagPattern) || []
 
-  if (templates.length === 0) {
-    // Check if imperative tools exist (we can't validate schema for those from HTML alone)
-    const hasImperative = /navigator\.ai\.registerTool/i.test(html)
+  // Filter to forms that have at least one WebMCP attribute
+  const webmcpForms = formTags.filter(
+    (tag) => /\btoolname\s*=/i.test(tag) || /\btooldescription\s*=/i.test(tag)
+  )
+
+  if (webmcpForms.length === 0) {
+    // Check for imperative or legacy
+    const hasImperative = /navigator\.modelContext\.registerTool|navigator\.ai\.registerTool/i.test(html)
     if (hasImperative) {
       return {
         id: 'webmcp-schema',
         title: 'WebMCP-Schema gültig',
-        description:
-          'Prüft, ob die deklarierten WebMCP-Tools eine gültige Schema-Struktur haben ' +
-          '(korrekte Attribute, Typ-Annotationen, beschreibende Inhalte).',
+        description: BASE_DESC,
         passed: null,
-        details: 'Nur imperative WebMCP-Tools gefunden — Schema-Validierung erfordert deklarative Templates.',
+        details: 'Nur imperative WebMCP-Tools gefunden — Schema-Validierung gilt nur für deklarative Formulare.',
+        learnMoreUrl: LEARN_MORE,
       }
     }
 
     return {
       id: 'webmcp-schema',
       title: 'WebMCP-Schema gültig',
-      description:
-        'Prüft, ob die deklarierten WebMCP-Tools eine gültige Schema-Struktur haben ' +
-        '(korrekte Attribute, Typ-Annotationen, beschreibende Inhalte).',
+      description: BASE_DESC,
       passed: null,
-      details: 'Keine WebMCP-Tool-Deklarationen gefunden — Audit nicht anwendbar.',
+      details: 'Keine WebMCP-annotierten Formulare gefunden — Audit nicht anwendbar.',
+      learnMoreUrl: LEARN_MORE,
     }
   }
 
-  // Validate each template
+  // Validate each annotated form tag
   const issues: string[] = []
   let validCount = 0
 
-  for (const tpl of templates) {
-    // Check required attribute: data-webmcp-tool="name"
-    const nameMatch = tpl.match(/data-webmcp-tool=["']([^"']+)["']/i)
-    if (!nameMatch || !nameMatch[1].trim()) {
-      issues.push('Tool ohne Namen (data-webmcp-tool ist leer)')
-      continue
-    }
+  for (const tag of webmcpForms) {
+    const hasToolname = /\btoolname\s*=\s*["']([^"']+)["']/i.test(tag)
+    const hasTooldescription = /\btooldescription\s*=/i.test(tag)
+    const toolnameMatch = tag.match(/\btoolname\s*=\s*["']([^"']+)["']/i)
+    const toolName = toolnameMatch?.[1] || '(unbenannt)'
 
-    const toolName = nameMatch[1]
-
-    // Check for description attribute
-    const hasDescription = /data-webmcp-description/i.test(tpl)
-    if (!hasDescription) {
-      issues.push(`"${toolName}": Keine Beschreibung (data-webmcp-description fehlt)`)
-    }
-
-    // Check for input/param definitions (should have data-webmcp-param or similar)
-    const hasParams = /data-webmcp-param|data-webmcp-input|<input|<select|<textarea/i.test(tpl)
-
-    if (hasDescription || hasParams) {
+    if (hasToolname && !hasTooldescription) {
+      issues.push(`"${toolName}": toolname vorhanden, aber tooldescription fehlt`)
+    } else if (!hasToolname && hasTooldescription) {
+      issues.push('Formular mit tooldescription, aber ohne toolname')
+    } else {
       validCount++
     }
   }
 
-  const passed = issues.length === 0 && validCount === templates.length
+  // Also check inputs within annotated forms for name + toolparamdescription
+  // Extract form blocks that contain toolname
+  const formBlockPattern = /<form\b[^>]*\btoolname\s*=[^>]*>[\s\S]*?<\/form>/gi
+  const formBlocks = html.match(formBlockPattern) || []
+
+  let inputsMissingName = 0
+  let inputsWithoutParamDesc = 0
+  let totalInputs = 0
+
+  for (const block of formBlocks) {
+    // Find all inputs, selects, textareas
+    const inputPattern = /<(?:input|select|textarea)\b[^>]*>/gi
+    const inputs = block.match(inputPattern) || []
+
+    for (const inp of inputs) {
+      // Skip hidden, submit, button types
+      if (/type\s*=\s*["'](?:hidden|submit|button|reset|image)["']/i.test(inp)) continue
+      totalInputs++
+
+      const hasName = /\bname\s*=/i.test(inp)
+      if (!hasName) inputsMissingName++
+
+      const hasParamDesc = /\btoolparamdescription\s*=/i.test(inp)
+      if (!hasParamDesc) inputsWithoutParamDesc++
+    }
+  }
+
+  if (inputsMissingName > 0) {
+    issues.push(`${inputsMissingName} Input(s) ohne name-Attribut — Pflichtfeld für WebMCP`)
+  }
+
+  const passed = issues.length === 0 && validCount === webmcpForms.length
+
+  const detailParts: string[] = []
+  if (validCount > 0) detailParts.push(`${validCount}/${webmcpForms.length} Formular(e) korrekt annotiert`)
+  if (totalInputs > 0) {
+    const described = totalInputs - inputsWithoutParamDesc
+    detailParts.push(`${described}/${totalInputs} Input(s) mit toolparamdescription`)
+  }
+  if (issues.length > 0) detailParts.push(`Probleme: ${issues.join('; ')}`)
+  if (inputsWithoutParamDesc > 0 && inputsMissingName === 0) {
+    detailParts.push(`Hinweis: ${inputsWithoutParamDesc} Input(s) ohne toolparamdescription — empfohlen für bessere Agent-Interaktion`)
+  }
 
   return {
     id: 'webmcp-schema',
     title: 'WebMCP-Schema gültig',
-    description:
-      'Prüft, ob die deklarierten WebMCP-Tools eine gültige Schema-Struktur haben ' +
-      '(korrekte Attribute, Typ-Annotationen, beschreibende Inhalte).',
+    description: BASE_DESC,
     passed,
-    details: passed
-      ? `${templates.length} WebMCP-Template(s) mit gültigem Schema.`
-      : issues.length > 0
-        ? `Schema-Probleme: ${issues.join('; ')}`
-        : `${validCount}/${templates.length} Templates validiert.`,
-    learnMoreUrl: 'https://AminFazl.github.io/WebMCP/',
+    details: detailParts.join('. ') + '.',
+    learnMoreUrl: LEARN_MORE,
   }
 }
 
@@ -362,7 +435,7 @@ function auditAgentAccessibility(html: string): AuditResult {
         'Labels, semantisches HTML. Agenten navigieren Websites über den A11y-Tree, nicht visuell.',
       passed: false,
       details: 'Website nicht erreichbar',
-      learnMoreUrl: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring',
+      learnMoreUrl: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/accessibility-for-agents',
     }
   }
 
@@ -450,7 +523,7 @@ function auditAgentAccessibility(html: string): AuditResult {
       'Labels, semantisches HTML. Agenten navigieren Websites über den A11y-Tree, nicht visuell.',
     passed,
     details: detailParts.join(' — '),
-    learnMoreUrl: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring',
+    learnMoreUrl: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/accessibility-for-agents',
   }
 }
 
