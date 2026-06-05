@@ -427,7 +427,7 @@ export function AgenticBrowsingCheck({ domain }: { domain: string }) {
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-0.5">•</span>
                 <span>
-                  <strong>WebMCP-Tools registrieren:</strong> Fügen Sie <code className="bg-blue-100 px-1 rounded">{'<template data-webmcp-tool="name">'}</code>-Elemente in Ihren HTML-Code ein, damit KI-Agenten mit Ihrer Website interagieren können.
+                  <strong>WebMCP-Tools registrieren:</strong> Fügen Sie <code className="bg-blue-100 px-1 rounded">toolname</code> und <code className="bg-blue-100 px-1 rounded">tooldescription</code> Attribute auf Ihren {'<form>'}-Elementen hinzu, damit KI-Agenten mit Ihrer Website interagieren können.
                 </span>
               </li>
             )}
@@ -435,7 +435,7 @@ export function AgenticBrowsingCheck({ domain }: { domain: string }) {
               <li className="flex items-start gap-2">
                 <span className="text-blue-400 mt-0.5">•</span>
                 <span>
-                  <strong>Formulare annotieren:</strong> Jedes {'<form>'} sollte ein zugehöriges WebMCP-Template haben, das die Formular-Interaktion beschreibt.
+                  <strong>Formulare annotieren:</strong> Jedes {'<form>'} braucht <code className="bg-blue-100 px-1 rounded">toolname</code> + <code className="bg-blue-100 px-1 rounded">tooldescription</code>, und jedes Input-Feld ein <code className="bg-blue-100 px-1 rounded">toolparamdescription</code> Attribut.
                 </span>
               </li>
             )}
