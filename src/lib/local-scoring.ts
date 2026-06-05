@@ -5,23 +5,36 @@
  * even when the external workflow has timeouts or parsing issues.
  */
 
-const FETCH_OPTS: RequestInit = {
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (compatible; LLMRadar/1.0; +https://llmradar.de)',
-    Accept: 'text/html, application/json, text/plain, */*',
-  },
-  redirect: 'follow',
-  // @ts-ignore - Node 18+ supports AbortSignal.timeout
-  signal: AbortSignal.timeout(10000),
+const FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (compatible; LLMRadar/1.0; +https://llmradar.de)',
+  Accept: 'text/html, application/json, text/plain, */*',
+}
+
+const FETCH_TIMEOUT = 10_000
+
+/**
+ * Build fresh fetch options per call.
+ *
+ * IMPORTANT: AbortSignal.timeout() must be created per-request.
+ * A module-level signal expires once and silently aborts every
+ * subsequent fetch in a long-running server process.
+ */
+function fetchOpts(extra?: RequestInit): RequestInit {
+  return {
+    headers: FETCH_HEADERS,
+    redirect: 'follow',
+    signal: AbortSignal.timeout(FETCH_TIMEOUT),
+    ...extra,
+  }
 }
 
 /** Check if a URL returns a 200 response */
 async function urlExists(url: string): Promise<boolean> {
   try {
-    const resp = await fetch(url, { ...FETCH_OPTS, method: 'HEAD' })
+    const resp = await fetch(url, fetchOpts({ method: 'HEAD' }))
     if (resp.ok) return true
     // Some servers don't support HEAD, try GET
-    const resp2 = await fetch(url, FETCH_OPTS)
+    const resp2 = await fetch(url, fetchOpts())
     return resp2.ok
   } catch {
     return false
@@ -31,7 +44,7 @@ async function urlExists(url: string): Promise<boolean> {
 /** Fetch text content of a URL, return null if failed */
 async function fetchText(url: string): Promise<string | null> {
   try {
-    const resp = await fetch(url, FETCH_OPTS)
+    const resp = await fetch(url, fetchOpts())
     if (!resp.ok) return null
     return resp.text()
   } catch {
@@ -202,13 +215,12 @@ export async function computeSchemaScore(domain: string): Promise<SchemaCheckRes
   const result: SchemaCheckResult = { score: 0, count: 0, types: [], errors: [] }
 
   try {
-    const resp = await fetch(`https://${domain}`, {
-      ...FETCH_OPTS,
+    const resp = await fetch(`https://${domain}`, fetchOpts({
       headers: {
-        ...FETCH_OPTS.headers as Record<string, string>,
+        ...FETCH_HEADERS,
         Accept: 'text/html',
       },
-    })
+    }))
     if (!resp.ok) {
       result.errors.push(`HTTP ${resp.status}`)
       return result
