@@ -89,6 +89,35 @@ interface DiagnosisResult {
   reportJson: string
 }
 
+/**
+ * Fire a Meta Pixel event, retrying until fbq is available.
+ * The pixel script loads with strategy="afterInteractive" so fbq may not
+ * exist when React useEffect / event handlers fire. This helper polls
+ * every 200 ms for up to 5 seconds before giving up silently.
+ */
+function trackPixelEvent(eventName: string, params?: Record<string, unknown>) {
+  if (typeof window === 'undefined') return
+
+  const fire = () => {
+    if (window.fbq) {
+      window.fbq('track', eventName, params)
+      return true
+    }
+    return false
+  }
+
+  if (fire()) return
+
+  let attempts = 0
+  const maxAttempts = 25 // 25 × 200ms = 5s
+  const interval = setInterval(() => {
+    attempts++
+    if (fire() || attempts >= maxAttempts) {
+      clearInterval(interval)
+    }
+  }, 200)
+}
+
 export default function KostenlosPage() {
   const [step, setStep] = useState<'form' | 'analyzing' | 'result' | 'error'>('form')
   const [email, setEmail] = useState('')
@@ -100,12 +129,10 @@ export default function KostenlosPage() {
 
   // Fire ViewContent pixel event on mount
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.fbq) {
-      window.fbq('track', 'ViewContent', {
-        content_name: 'Kostenlose GEO-Analyse',
-        content_category: 'landing_page',
-      })
-    }
+    trackPixelEvent('ViewContent', {
+      content_name: 'Kostenlose GEO-Analyse',
+      content_category: 'landing_page',
+    })
   }, [])
 
   const progressSteps = [
@@ -138,12 +165,10 @@ export default function KostenlosPage() {
     }
 
     // Fire Lead pixel event
-    if (typeof window !== 'undefined' && window.fbq) {
-      window.fbq('track', 'Lead', {
-        content_name: 'GEO-Analyse gestartet',
-        content_category: 'free_analysis',
-      })
-    }
+    trackPixelEvent('Lead', {
+      content_name: 'GEO-Analyse gestartet',
+      content_category: 'free_analysis',
+    })
 
     setStep('analyzing')
     setProgress(0)
@@ -203,13 +228,11 @@ export default function KostenlosPage() {
       setStep('result')
 
       // Fire CompleteRegistration pixel event
-      if (typeof window !== 'undefined' && window.fbq) {
-        window.fbq('track', 'CompleteRegistration', {
-          content_name: 'GEO-Analyse abgeschlossen',
-          value: r.score,
-          currency: 'EUR',
-        })
-      }
+      trackPixelEvent('CompleteRegistration', {
+        content_name: 'GEO-Analyse abgeschlossen',
+        value: r.score,
+        currency: 'EUR',
+      })
     } catch (err) {
       clearInterval(progressInterval)
       setErrorMsg((err as Error).message || 'Ein unbekannter Fehler ist aufgetreten.')
