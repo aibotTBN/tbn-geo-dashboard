@@ -162,7 +162,7 @@ interface MonitoringAlertData {
   scoreSchema: number
   scoreContent: number
   scoreFresh: number
-  recommendations: string[]
+  recommendations: (string | { priority?: string; category?: string; text: string })[]
 }
 
 export async function sendMonitoringAlertEmail(
@@ -188,7 +188,7 @@ export async function sendMonitoringAlertEmail(
     ? `
       <h3 style="color: #1e293b; font-size: 16px; margin-top: 24px;">Empfehlungen</h3>
       <ul style="color: #475569; line-height: 1.8; padding-left: 20px;">
-        ${data.recommendations.slice(0, 5).map(r => `<li>${r}</li>`).join('')}
+        ${data.recommendations.slice(0, 5).map(r => `<li>${typeof r === 'object' && r !== null ? (r as any).text || JSON.stringify(r) : r}</li>`).join('')}
       </ul>`
     : ''
 
