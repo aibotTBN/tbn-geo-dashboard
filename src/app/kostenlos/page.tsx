@@ -519,6 +519,18 @@ export default function KostenlosPage() {
                 LLM Radar misst nicht nur — sondern hilft aktiv bei der Optimierung.
               </p>
 
+              {/* How-to Video */}
+              <div className="mb-5 rounded-xl overflow-hidden border border-blue-200 bg-black aspect-video">
+                <iframe
+                  src="https://www.youtube.com/embed/bsd2m-6gAtQ?rel=0"
+                  title="LLM Radar — Features &amp; How-to"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="w-full h-full"
+                  loading="lazy"
+                />
+              </div>
+
               <div className="space-y-3 mb-6">
                 {[
                   { icon: Zap, title: 'Knowledge Builder', desc: 'Maschinenlesbare Wissensbasis für KI-Systeme' },
