@@ -40,6 +40,7 @@ export default withAuth(
           '/api/geo/monitoring-cron', // Monitoring cron (protected by CRON_SECRET)
           '/api/beta',      // Free beta analysis API
           '/beta',          // Free beta analysis page
+          '/kostenlos',     // Free landing page (Meta Ads traffic)
           '/agb',           // Legal: Terms of Service
           '/datenschutz',   // Legal: Privacy Policy
         ]
