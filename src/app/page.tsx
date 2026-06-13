@@ -565,6 +565,36 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ═══════════════ VIDEO: SEE IT IN ACTION ═══════════════ */}
+      <section className="py-20 lg:py-28">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-full px-4 py-1.5 mb-6">
+              <Eye className="w-4 h-4 text-purple-600" />
+              <span className="text-sm font-medium text-purple-700">Video-Tour</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
+              Sehen Sie LLM Radar in Aktion
+            </h2>
+            <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+              In 2 Minuten: So analysieren Sie Ihre KI-Sichtbarkeit und bauen strukturiertes Wissen für ChatGPT, Claude &amp; Co. auf.
+            </p>
+          </div>
+          <div className="max-w-4xl mx-auto">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-blue-900/10 border border-gray-200 bg-black aspect-video">
+              <iframe
+                src="https://www.youtube.com/embed/bsd2m-6gAtQ?rel=0"
+                title="LLM Radar — Features &amp; How-to"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                className="absolute inset-0 w-full h-full"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ═══════════════ KNOWLEDGE BUILDER ═══════════════ */}
       <section id="knowledge" className="py-20 lg:py-28 bg-slate-900 text-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
